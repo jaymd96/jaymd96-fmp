@@ -434,10 +434,11 @@ def resolve_fields(
     and derived registries).
     """
     from fmp._features import DERIVED_REGISTRY
+    from fmp._features._post_compute import POST_COMPUTE_REGISTRY
 
     unknown = [
         n for n in names
-        if n not in FIELD_REGISTRY and n not in DERIVED_REGISTRY
+        if n not in FIELD_REGISTRY and n not in DERIVED_REGISTRY and n not in POST_COMPUTE_REGISTRY
     ]
     if unknown:
         raise ValueError(f"Unknown fields: {unknown}")
@@ -453,12 +454,17 @@ def resolve_fields(
 
 
 def list_fields(dataset: str | None = None) -> list[str]:
-    """List available field names (base + derived), optionally filtered by dataset."""
+    """List available field names (base + derived + post-compute)."""
     from fmp._features import DERIVED_REGISTRY
+    from fmp._features._post_compute import POST_COMPUTE_REGISTRY
 
     if dataset:
         ds = DATASETS.get(dataset)
         if not ds:
             raise ValueError(f"Unknown dataset: {dataset}")
         return list(ds.fields.keys())
-    return sorted(set(list(FIELD_REGISTRY.keys()) + list(DERIVED_REGISTRY.keys())))
+    return sorted(set(
+        list(FIELD_REGISTRY.keys())
+        + list(DERIVED_REGISTRY.keys())
+        + list(POST_COMPUTE_REGISTRY.keys())
+    ))

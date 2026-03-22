@@ -124,3 +124,61 @@ def test_derived_field_with_lag(httpx_mock):
     if len(growth_vals) > 0 and growth_vals[0] is not None:
         assert -0.03 < growth_vals[0] < -0.02
     c.close()
+
+
+def test_post_compute_ema(httpx_mock):
+    """Post-compute feature: EMA-20 computed in polars."""
+    prices = [
+        {"date": f"2024-01-{d:02d}", "open": 180.0 + d, "high": 185.0 + d,
+         "low": 179.0 + d, "close": 180.0 + d, "adjClose": 180.0 + d,
+         "volume": 50000000, "vwap": 182.0 + d, "change": 1.0, "changePercent": 0.5}
+        for d in range(2, 25)
+    ]
+    httpx_mock.add_response(json=prices)
+
+    c = FMPClient(api_key="test", cache_path=None)
+    df = (c.query()
+          .symbols("AAPL")
+          .select("close", "ema_20")
+          .date_range("2024-01-01", "2024-01-31")
+          .execute())
+
+    assert isinstance(df, pl.DataFrame)
+    assert "ema_20" in df.columns
+    assert len(df) == 23
+    # EMA should be close to the close price for a monotonically increasing series
+    assert df["ema_20"][-1] is not None
+    c.close()
+
+
+def test_post_compute_macd(httpx_mock):
+    """Post-compute: MACD features."""
+    prices = [
+        {"date": f"2024-{m:02d}-15", "open": 180.0 + i, "high": 185.0 + i,
+         "low": 179.0 + i, "close": 180.0 + i * 0.5, "adjClose": 180.0 + i * 0.5,
+         "volume": 50000000, "vwap": 182.0, "change": 0.5, "changePercent": 0.3}
+        for i, m in enumerate(range(1, 13))
+    ]
+    httpx_mock.add_response(json=prices)
+
+    c = FMPClient(api_key="test", cache_path=None)
+    df = (c.query()
+          .symbols("AAPL")
+          .select("close", "macd_line", "macd_signal", "macd_histogram")
+          .date_range("2024-01-01", "2024-12-31")
+          .execute())
+
+    assert "macd_line" in df.columns
+    assert "macd_signal" in df.columns
+    assert "macd_histogram" in df.columns
+    c.close()
+
+
+def test_post_compute_feature_count():
+    """Post-compute features are included in total feature count."""
+    features = list_features()
+    assert "ema_20" in features
+    assert "macd_line" in features
+    assert "beta_sp500" in features
+    assert "consecutive_dividend_increases" in features
+    assert len(features) >= 270

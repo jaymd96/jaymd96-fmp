@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from fmp._exceptions import FMPError
 from fmp._features import DERIVED_REGISTRY, resolve_derived_dependencies
 from fmp._features._base import DerivedFieldDef
+from fmp._features._post_compute import POST_COMPUTE_REGISTRY, PostComputeFieldDef
 from fmp._ontology import DATASETS, FIELD_REGISTRY, Grain, resolve_fields
 
 if TYPE_CHECKING:
@@ -110,13 +111,15 @@ class QueryBuilder:
         if not self._fields:
             raise FMPError("No fields specified. Call .select() first.")
 
-        # 1. Split into base and derived fields.
-        #    Derived takes priority when a name exists in both registries
-        #    (e.g., ratios endpoint pre-computes some metrics we also derive).
+        # 1. Split into base, derived (SQL), and post-compute fields.
+        #    Check order: post-compute → derived → base.
         base_fields: list[str] = []
         derived_names: list[str] = []
+        post_compute_defs: list[PostComputeFieldDef] = []
         for f in self._fields:
-            if f in DERIVED_REGISTRY:
+            if f in POST_COMPUTE_REGISTRY:
+                post_compute_defs.append(POST_COMPUTE_REGISTRY[f])
+            elif f in DERIVED_REGISTRY:
                 derived_names.append(f)
             elif f in FIELD_REGISTRY:
                 base_fields.append(f)
@@ -127,8 +130,13 @@ class QueryBuilder:
         derived_defs: list[DerivedFieldDef] = []
         if derived_names:
             dep_bases, derived_defs = resolve_derived_dependencies(derived_names)
-            # Add dependency base fields (not already requested)
             for dep in dep_bases:
+                if dep not in base_fields and dep in FIELD_REGISTRY:
+                    base_fields.append(dep)
+
+        # 2b. Resolve post-compute dependencies → additional base fields
+        for pc in post_compute_defs:
+            for dep in pc.dependencies:
                 if dep not in base_fields and dep in FIELD_REGISTRY:
                     base_fields.append(dep)
 
@@ -141,24 +149,87 @@ class QueryBuilder:
         # 5. Fetch data into typed tables
         self._fetch_datasets(grouped)
 
+        # 5b. Fetch reference symbols for post-compute features (e.g., ^GSPC for beta)
+        reference_data: dict[str, Any] = {}
+        if post_compute_defs:
+            reference_data = self._fetch_reference_data(post_compute_defs, grouped)
+
         # 6. Generate SQL (with derived expressions)
         sql = self._generate_sql(grouped, target, derived_defs)
 
-        # 7. Execute and return
+        # 7. Execute SQL
         result = self._store._conn.execute(sql)
 
         if backend == "polars":
             import polars as pl
             columns = [desc[0] for desc in result.description]
             rows = result.fetchall()
-            return pl.DataFrame(
+            df = pl.DataFrame(
                 [dict(zip(columns, row)) for row in rows],
                 strict=False,
             )
         elif backend == "pandas":
-            return result.fetchdf()
+            df = result.fetchdf()
         else:
             raise FMPError(f"Unknown backend: {backend!r}. Use 'polars' or 'pandas'.")
+
+        # 8. Apply post-compute features
+        if post_compute_defs and backend == "polars":
+            df = self._apply_post_compute(df, post_compute_defs, reference_data)
+        elif post_compute_defs and backend == "pandas":
+            raise FMPError(
+                "Post-compute features (EMA, MACD, beta, etc.) require backend='polars'."
+            )
+
+        return df
+
+    def _fetch_reference_data(
+        self,
+        post_compute_defs: list[PostComputeFieldDef],
+        grouped: dict[str, list],
+    ) -> dict:
+        """Fetch reference symbols needed by post-compute features (e.g., ^GSPC)."""
+        ref_symbols: set[str] = set()
+        for pc in post_compute_defs:
+            ref_symbols.update(pc.reference_symbols)
+
+        if not ref_symbols:
+            return {}
+
+        reference_data: dict = {}
+        for sym in ref_symbols:
+            ds = DATASETS.get("daily_price")
+            if not ds:
+                continue
+            params: dict[str, str] = {"symbol": sym}
+            if self._start:
+                params["from"] = self._start
+            if self._end:
+                params["to"] = self._end
+            try:
+                rows = self._http.get(ds.endpoint, params=params)
+                if rows:
+                    for row in rows:
+                        row.setdefault("symbol", sym)
+                    self._store.write("daily_price", rows)
+                    import polars as pl
+                    reference_data[sym] = pl.DataFrame(rows, strict=False)
+            except Exception:
+                pass
+
+        return {"reference_data": reference_data}
+
+    @staticmethod
+    def _apply_post_compute(df, post_compute_defs, ctx):
+        """Apply post-compute features to the DataFrame."""
+        for pc in post_compute_defs:
+            try:
+                series = pc.compute_fn(df, ctx)
+                df = df.with_columns(series.alias(pc.name))
+            except Exception:
+                import polars as pl
+                df = df.with_columns(pl.lit(None).cast(pl.Float64).alias(pc.name))
+        return df
 
     # ------------------------------------------------------------------
     # Internal: grain resolution

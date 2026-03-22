@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fmp._features._base import DerivedFieldDef
+from fmp._features._post_compute import POST_COMPUTE_REGISTRY, PostComputeFieldDef
 
 from fmp._features.profitability import FEATURES as _profitability
 from fmp._features.liquidity import FEATURES as _liquidity
@@ -53,12 +54,20 @@ def resolve_derived_dependencies(names: list[str]) -> tuple[list[str], list[Deri
 
 
 def list_features(category: str | None = None) -> list[str]:
-    """List available derived feature names, optionally filtered by category."""
+    """List available feature names (SQL-derived + post-compute)."""
+    from fmp._features._post_compute import POST_COMPUTE_REGISTRY
+
     if category:
-        return [f.name for f in _ALL_FEATURES if f.category == category]
-    return list(DERIVED_REGISTRY.keys())
+        sql = [f.name for f in _ALL_FEATURES if f.category == category]
+        post = [f.name for f in POST_COMPUTE_REGISTRY.values() if f.category == category]
+        return sql + post
+    return list(DERIVED_REGISTRY.keys()) + list(POST_COMPUTE_REGISTRY.keys())
 
 
 def feature_categories() -> list[str]:
     """List all feature categories."""
-    return sorted({f.category for f in _ALL_FEATURES if f.category})
+    from fmp._features._post_compute import POST_COMPUTE_REGISTRY
+
+    cats = {f.category for f in _ALL_FEATURES if f.category}
+    cats |= {f.category for f in POST_COMPUTE_REGISTRY.values() if f.category}
+    return sorted(cats)
