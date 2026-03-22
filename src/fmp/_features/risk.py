@@ -110,4 +110,29 @@ FEATURES = [
     ),
     # ── earnings_volatility: skipped — requires 8-quarter rolling
     #    aggregation that cannot be expressed in a single SQL expression.
+    # ── Average True Range (14-day) ──────────────────────────────────
+    _d(
+        "atr_14",
+        "AVG(GREATEST(high - low,"
+        " ABS(high - LAG(close) OVER w),"
+        " ABS(low - LAG(close) OVER w)))"
+        " OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 13 PRECEDING AND CURRENT ROW)",
+        ("high", "low", "close"),
+        category="risk",
+        lag=True,
+    ),
+    # ── Downside volatility (annualised) ─────────────────────────────
+    _d(
+        "down_volatility_20d",
+        "STDDEV(CASE WHEN close < LAG(close) OVER w"
+        " THEN (close - LAG(close) OVER w)"
+        " / NULLIF(LAG(close) OVER w, 0)"
+        " ELSE NULL END)"
+        " OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) * SQRT(252)",
+        ("close",),
+        category="risk",
+        lag=True,
+    ),
 ]

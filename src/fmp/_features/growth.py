@@ -103,4 +103,51 @@ FEATURES = [
         "weighted_avg_shares_diluted",
         ("weighted_avg_shares_diluted",),
     ),
+    # ── CAGR features (multi-year compounding) ───────────────────────
+    _d(
+        "revenue_cagr_3y",
+        "POWER(revenue / NULLIF(LAG(revenue, 3) OVER w, 0), 1.0 / 3) - 1",
+        ("revenue",),
+        category="growth",
+        lag=True,
+    ),
+    _d(
+        "revenue_cagr_5y",
+        "POWER(revenue / NULLIF(LAG(revenue, 5) OVER w, 0), 1.0 / 5) - 1",
+        ("revenue",),
+        category="growth",
+        lag=True,
+    ),
+    _d(
+        "eps_cagr_3y",
+        "POWER(ABS(eps_diluted)"
+        " / NULLIF(ABS(LAG(eps_diluted, 3) OVER w), 0), 1.0 / 3) - 1",
+        ("eps_diluted",),
+        category="growth",
+        lag=True,
+    ),
+    _d(
+        "eps_cagr_5y",
+        "POWER(ABS(eps_diluted)"
+        " / NULLIF(ABS(LAG(eps_diluted, 5) OVER w), 0), 1.0 / 5) - 1",
+        ("eps_diluted",),
+        category="growth",
+        lag=True,
+    ),
+    _d(
+        "dividend_growth_3y",
+        "POWER(adj_dividend"
+        " / NULLIF(LAG(adj_dividend, 3) OVER w, 0), 1.0 / 3) - 1",
+        ("adj_dividend",),
+        category="growth",
+        lag=True,
+    ),
+    _d(
+        "market_cap_growth",
+        "(quote_market_cap - LAG(quote_market_cap) OVER w)"
+        " / NULLIF(ABS(LAG(quote_market_cap) OVER w), 0)",
+        ("quote_market_cap",),
+        category="growth",
+        lag=True,
+    ),
 ]

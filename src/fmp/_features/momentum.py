@@ -100,4 +100,18 @@ FEATURES = [
         category="momentum",
         lag=True,
     ),
+    # ── Up/down volume ratio (20-day) ────────────────────────────────
+    _d(
+        "up_down_volume_ratio_20d",
+        "SUM(CASE WHEN close > LAG(close) OVER w THEN volume ELSE 0 END)"
+        " OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)"
+        " / NULLIF(SUM(CASE WHEN close <= LAG(close) OVER w"
+        " THEN volume ELSE 0 END)"
+        " OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 19 PRECEDING AND CURRENT ROW), 0)",
+        ("close", "volume"),
+        category="momentum",
+        lag=True,
+    ),
 ]

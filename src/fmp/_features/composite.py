@@ -285,4 +285,79 @@ FEATURES = [
         ("enterprise_value", "ebitda"),
         category="composite",
     ),
+    # ── Montier C-Score (§1.6 — 6 binary earnings-quality signals) ──
+    _d(
+        "montier_c_score",
+        # C1: Net income growing but OCF declining
+        "CASE WHEN net_income > LAG(net_income) OVER w"
+        " AND operating_cash_flow < LAG(operating_cash_flow) OVER w"
+        " THEN 1 ELSE 0 END"
+        # C2: Growing receivable days
+        " + CASE WHEN (net_receivables / NULLIF(revenue, 0))"
+        " > (LAG(net_receivables) OVER w / NULLIF(LAG(revenue) OVER w, 0))"
+        " THEN 1 ELSE 0 END"
+        # C3: Growing inventory days
+        " + CASE WHEN (inventory / NULLIF(cost_of_revenue, 0))"
+        " > (LAG(inventory) OVER w / NULLIF(LAG(cost_of_revenue) OVER w, 0))"
+        " THEN 1 ELSE 0 END"
+        # C4: Growing other current assets as % of revenue
+        " + CASE WHEN (other_current_assets / NULLIF(revenue, 0))"
+        " > (LAG(other_current_assets) OVER w / NULLIF(LAG(revenue) OVER w, 0))"
+        " THEN 1 ELSE 0 END"
+        # C5: Declining depreciation rate
+        " + CASE WHEN (depreciation_and_amortization"
+        " / NULLIF(depreciation_and_amortization + property_plant_equipment, 0))"
+        " < (LAG(depreciation_and_amortization) OVER w"
+        " / NULLIF(LAG(depreciation_and_amortization) OVER w"
+        " + LAG(property_plant_equipment) OVER w, 0))"
+        " THEN 1 ELSE 0 END"
+        # C6: High total asset growth (>10%)
+        " + CASE WHEN (total_assets - LAG(total_assets) OVER w)"
+        " / NULLIF(ABS(LAG(total_assets) OVER w), 0) > 0.10"
+        " THEN 1 ELSE 0 END",
+        (
+            "net_income",
+            "operating_cash_flow",
+            "net_receivables",
+            "revenue",
+            "inventory",
+            "cost_of_revenue",
+            "other_current_assets",
+            "depreciation_and_amortization",
+            "property_plant_equipment",
+            "total_assets",
+        ),
+        category="composite",
+        dtype="INTEGER",
+        lag=True,
+    ),
+    # ── Ohlson O-Score (§1.4 — simplified, no GNP deflator) ────────
+    _d(
+        "ohlson_o_score",
+        "-1.32"
+        " - 0.407 * LN(total_assets / 1000000.0)"
+        " + 6.03 * (total_liabilities / NULLIF(total_assets, 0))"
+        " - 1.43 * ((total_current_assets - total_current_liabilities)"
+        " / NULLIF(total_assets, 0))"
+        " + 0.076 * (total_current_liabilities"
+        " / NULLIF(total_current_assets, 0))"
+        " - 1.72 * (CASE WHEN total_liabilities > total_assets"
+        " THEN 1 ELSE 0 END)"
+        " - 2.37 * (net_income / NULLIF(total_assets, 0))"
+        " - 1.83 * (operating_cash_flow / NULLIF(total_liabilities, 0))"
+        " + 0.285 * (CASE WHEN net_income < 0"
+        " AND LAG(net_income) OVER w < 0 THEN 1 ELSE 0 END)"
+        " - 0.521 * ((net_income - LAG(net_income) OVER w)"
+        " / NULLIF(ABS(net_income) + ABS(LAG(net_income) OVER w), 0))",
+        (
+            "total_assets",
+            "total_liabilities",
+            "total_current_assets",
+            "total_current_liabilities",
+            "net_income",
+            "operating_cash_flow",
+        ),
+        category="composite",
+        lag=True,
+    ),
 ]

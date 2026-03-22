@@ -108,8 +108,133 @@ FEATURES = [
         category="technical",
         lag=True,
     ),
-    # ── price_to_sma_50: skipped — requires AVG window which should
-    #    come from FMP's technical-indicators endpoint.
-    # ── bollinger_position: skipped — requires SMA + STDDEV rolling
-    #    calculation better sourced from FMP endpoint.
+    # ── Simple moving averages ─────────────────────────────────────────
+    _d(
+        "sma_20",
+        "AVG(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)",
+        ("close",),
+        category="technical",
+        lag=True,
+    ),
+    _d(
+        "sma_50",
+        "AVG(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 49 PRECEDING AND CURRENT ROW)",
+        ("close",),
+        category="technical",
+        lag=True,
+    ),
+    _d(
+        "sma_200",
+        "AVG(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 199 PRECEDING AND CURRENT ROW)",
+        ("close",),
+        category="technical",
+        lag=True,
+    ),
+    # ── Price relative to SMA ────────────────────────────────────────
+    _d(
+        "price_to_sma_20",
+        "close / NULLIF(AVG(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 19 PRECEDING AND CURRENT ROW), 0)",
+        ("close",),
+        category="technical",
+        lag=True,
+    ),
+    _d(
+        "price_to_sma_50",
+        "close / NULLIF(AVG(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 49 PRECEDING AND CURRENT ROW), 0)",
+        ("close",),
+        category="technical",
+        lag=True,
+    ),
+    _d(
+        "price_to_sma_200",
+        "close / NULLIF(AVG(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 199 PRECEDING AND CURRENT ROW), 0)",
+        ("close",),
+        category="technical",
+        lag=True,
+    ),
+    # ── SMA crossovers ───────────────────────────────────────────────
+    _d(
+        "sma_50_to_200",
+        "AVG(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 49 PRECEDING AND CURRENT ROW)"
+        " / NULLIF(AVG(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 199 PRECEDING AND CURRENT ROW), 0)",
+        ("close",),
+        category="technical",
+        lag=True,
+    ),
+    _d(
+        "golden_cross_flag",
+        "CASE WHEN AVG(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 49 PRECEDING AND CURRENT ROW)"
+        " > AVG(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 199 PRECEDING AND CURRENT ROW)"
+        " THEN 1 ELSE 0 END",
+        ("close",),
+        category="technical",
+        dtype="INTEGER",
+        lag=True,
+    ),
+    # ── Bollinger Bands ──────────────────────────────────────────────
+    _d(
+        "bollinger_upper",
+        "AVG(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)"
+        " + 2 * STDDEV(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)",
+        ("close",),
+        category="technical",
+        lag=True,
+    ),
+    _d(
+        "bollinger_lower",
+        "AVG(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)"
+        " - 2 * STDDEV(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)",
+        ("close",),
+        category="technical",
+        lag=True,
+    ),
+    _d(
+        "bollinger_pct_b",
+        "(close - (AVG(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)"
+        " - 2 * STDDEV(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)))"
+        " / NULLIF(4 * STDDEV(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 19 PRECEDING AND CURRENT ROW), 0)",
+        ("close",),
+        category="technical",
+        lag=True,
+    ),
+    _d(
+        "bollinger_bandwidth",
+        "(4 * STDDEV(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 19 PRECEDING AND CURRENT ROW))"
+        " / NULLIF(AVG(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 19 PRECEDING AND CURRENT ROW), 0)",
+        ("close",),
+        category="technical",
+        lag=True,
+    ),
+    # ── Accumulation / distribution ──────────────────────────────────
+    _d(
+        "accumulation_distribution",
+        "((close - low) - (high - close)) / NULLIF(high - low, 0) * volume",
+        ("close", "low", "high", "volume"),
+        category="technical",
+    ),
+    _d(
+        "money_flow_multiplier",
+        "((close - low) - (high - close)) / NULLIF(high - low, 0)",
+        ("close", "low", "high"),
+        category="technical",
+    ),
 ]
