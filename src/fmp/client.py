@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
+
+if TYPE_CHECKING:
+    from fmp._query import QueryBuilder
 
 from fmp._cache import DuckDBCache
 from fmp._config import DEFAULT_TTLS
 from fmp._exceptions import FMPError
 from fmp._http import HTTPClient
+from fmp._store import BitemporalStore
 
 from fmp._endpoints.search import SearchMixin
 from fmp._endpoints.directory import DirectoryMixin
@@ -105,6 +109,7 @@ class FMPClient(
             rate_limit=rate_limit,
         )
         self._cache = DuckDBCache(cache_path)
+        self._store = BitemporalStore(self._cache.connection)
         self._ttls: dict[str, int] = {**DEFAULT_TTLS, **(ttl_overrides or {})}
 
     # ------------------------------------------------------------------
@@ -207,6 +212,39 @@ class FMPClient(
             if len(batch) < limit:
                 break
         return all_results
+
+    # ------------------------------------------------------------------
+    # Query builder (ontology-driven DataFrame API)
+    # ------------------------------------------------------------------
+
+    def query(self) -> QueryBuilder:
+        """Start building a cross-dataset query.
+
+        Example::
+
+            df = (client.query()
+                .symbols("AAPL", "MSFT")
+                .select("close", "volume", "revenue", "net_income")
+                .date_range("2023-01-01", "2024-12-31")
+                .execute()
+            )
+        """
+        from fmp._query import QueryBuilder
+        return QueryBuilder(self._http, self._store, self._ttls)
+
+    def revisions(self, symbol: str, dataset: str, **filters: Any) -> list[dict]:
+        """See how data for a symbol changed across fetches.
+
+        Example::
+
+            client.revisions("AAPL", "income_statement", date="2023-09-30", period="FY")
+        """
+        return self._store.revisions(dataset, symbol, **filters)
+
+    @property
+    def store(self) -> BitemporalStore:
+        """The underlying :class:`BitemporalStore` instance."""
+        return self._store
 
     # ------------------------------------------------------------------
     # Cache access
