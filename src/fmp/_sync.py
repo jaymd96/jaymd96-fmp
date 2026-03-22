@@ -79,9 +79,16 @@ PER_SYMBOL_SNAPSHOT = {
 # Extra query params required by specific endpoints beyond symbol/date range.
 EXTRA_PARAMS: dict[str, dict[str, object]] = {
     "institutional_summary": {"year": 2024, "quarter": 4},
-    "analyst_estimates": {"period": "annual"},
+    "analyst_estimates": {"period": "annual", "limit": 100},
     "historical_grades": {"limit": 500},
     "historical_ratings": {"limit": 500},
+    # Financial statements: fetch quarterly data with full history
+    "income_statement": {"period": "quarter", "limit": 200},
+    "balance_sheet": {"period": "quarter", "limit": 200},
+    "cash_flow": {"period": "quarter", "limit": 200},
+    "key_metrics": {"period": "quarter", "limit": 200},
+    "ratios": {"period": "quarter", "limit": 200},
+    "enterprise_values": {"period": "quarter", "limit": 200},
 }
 
 
@@ -166,7 +173,18 @@ class SyncManager:
                     on_progress(_ds, msg)
 
             rows = 0
-            if ds_name in BULK_YEARLY and use_bulk:
+            # When specific symbols are given AND the dataset has a per-symbol
+            # endpoint, prefer per-symbol fetch (gets full history with quarterly
+            # data) over bulk (gets only latest annual for all symbols).
+            has_symbols = bool(symbols)
+            has_per_symbol_endpoint = ds_name in BULK_YEARLY or ds_name in PER_SYMBOL_TIMESERIES
+
+            if has_symbols and has_per_symbol_endpoint:
+                # Per-symbol fetch with full history (quarterly + annual)
+                rows = self._sync_per_symbol_ts(
+                    ds_name, symbols, start, end, max_workers, _prog
+                )
+            elif ds_name in BULK_YEARLY and use_bulk:
                 rows = self._sync_bulk_yearly(ds_name, start, end, period, _prog)
             elif ds_name in BULK_YEARLY_NO_PERIOD and use_bulk:
                 rows = self._sync_bulk_yearly_no_period(ds_name, start, end, _prog)
@@ -189,7 +207,6 @@ class SyncManager:
                     ds_name, symbols, start, end, max_workers, _prog
                 )
             elif symbols:
-                # Fallback — treat as per-symbol timeseries
                 rows = self._sync_per_symbol_ts(
                     ds_name, symbols, start, end, max_workers, _prog
                 )
