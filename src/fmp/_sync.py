@@ -415,9 +415,10 @@ class SyncManager:
                 count = self._store.write(ds_name, rows)
                 progress(f"{count} rows loaded")
                 return count
+            else:
+                progress("empty response — endpoint may not be available on this plan")
         except Exception as exc:
-            progress(f"failed: {exc}")
-        return 0
+            progress(f"failed: {exc} — skipping")
 
     def _sync_date_only(
         self, ds_name: str, start: str | None, end: str | None,

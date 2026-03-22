@@ -71,6 +71,12 @@ class HTTPClient:
             resp = self._client.get(path, params=params)
 
             if resp.status_code == 200:
+                content_type = resp.headers.get("content-type", "")
+                text = resp.text.strip()
+                if "text/csv" in content_type or (
+                    text and text[0] == '"' and "application/json" not in content_type
+                ):
+                    return _parse_csv(text)
                 data = resp.json()
                 # FMP returns error objects as dicts, not lists
                 if isinstance(data, dict) and "Error Message" in data:
@@ -95,6 +101,31 @@ class HTTPClient:
 
     def close(self) -> None:
         self._client.close()
+
+
+def _parse_csv(text: str) -> list[dict]:
+    """Parse CSV response from FMP bulk endpoints into list[dict]."""
+    import csv
+    import io
+    reader = csv.DictReader(io.StringIO(text))
+    rows = []
+    for row in reader:
+        cleaned: dict = {}
+        for k, v in row.items():
+            if v == "" or v is None or v == "None":
+                cleaned[k] = None
+            elif v in ("Infinity", "-Infinity", "NaN", "nan", "inf", "-inf"):
+                cleaned[k] = None  # can't store Infinity in DuckDB integers
+            else:
+                try:
+                    if "." in v:
+                        cleaned[k] = float(v)
+                    else:
+                        cleaned[k] = int(v)
+                except (ValueError, TypeError):
+                    cleaned[k] = v
+        rows.append(cleaned)
+    return rows
 
 
 def _safe_json(resp: httpx.Response) -> dict | None:
