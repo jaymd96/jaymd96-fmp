@@ -17,7 +17,7 @@ FEATURES = [
         f"1.2 * ({_X1}) "
         f"+ 1.4 * ({_X2}) "
         f"+ 3.3 * ({_X3}) "
-        "+ 0.6 * (quote_market_cap / NULLIF(total_liabilities, 0)) "
+        "+ 0.6 * (market_cap / NULLIF(total_liabilities, 0)) "
         f"+ 1.0 * ({_X5})",
         (
             "total_current_assets",
@@ -27,7 +27,7 @@ FEATURES = [
             "ebitda",
             "depreciation_and_amortization",
             "total_liabilities",
-            "quote_market_cap",
+            "market_cap",
             "revenue",
         ),
         category="composite",
@@ -167,10 +167,10 @@ FEATURES = [
     ),
     _d(
         "beneish_sgai",
-        "(selling_general_and_administrative / NULLIF(revenue, 0))"
-        " / NULLIF(LAG(selling_general_and_administrative) OVER w"
+        "(sga_expenses / NULLIF(revenue, 0))"
+        " / NULLIF(LAG(sga_expenses) OVER w"
         " / NULLIF(LAG(revenue) OVER w, 0), 0)",
-        ("selling_general_and_administrative", "revenue"),
+        ("sga_expenses", "revenue"),
         category="composite",
         lag=True,
     ),
@@ -216,8 +216,8 @@ FEATURES = [
         " / NULLIF(depreciation_and_amortization"
         " / NULLIF(depreciation_and_amortization + property_plant_equipment, 0), 0))"
         # SGAI
-        " - 0.172 * ((selling_general_and_administrative / NULLIF(revenue, 0))"
-        " / NULLIF(LAG(selling_general_and_administrative) OVER w"
+        " - 0.172 * ((sga_expenses / NULLIF(revenue, 0))"
+        " / NULLIF(LAG(sga_expenses) OVER w"
         " / NULLIF(LAG(revenue) OVER w, 0), 0))"
         # TATA
         " + 4.679 * ((net_income - operating_cash_flow) / NULLIF(total_assets, 0))"
@@ -233,7 +233,7 @@ FEATURES = [
             "total_current_assets",
             "property_plant_equipment",
             "depreciation_and_amortization",
-            "selling_general_and_administrative",
+            "sga_expenses",
             "net_income",
             "operating_cash_flow",
             "total_liabilities",
@@ -245,16 +245,16 @@ FEATURES = [
     _d(
         "graham_number",
         "SQRT(22.5 * ABS(eps_diluted)"
-        " * ABS(total_stockholders_equity / NULLIF(shares_outstanding, 0)))",
-        ("eps_diluted", "total_stockholders_equity", "shares_outstanding"),
+        " * ABS(total_stockholders_equity / NULLIF(outstanding_shares, 0)))",
+        ("eps_diluted", "total_stockholders_equity", "outstanding_shares"),
         category="composite",
     ),
     _d(
         "graham_margin_of_safety",
         "(SQRT(22.5 * ABS(eps_diluted)"
-        " * ABS(total_stockholders_equity / NULLIF(shares_outstanding, 0)))"
+        " * ABS(total_stockholders_equity / NULLIF(outstanding_shares, 0)))"
         " - price) / NULLIF(price, 0)",
-        ("eps_diluted", "total_stockholders_equity", "shares_outstanding", "price"),
+        ("eps_diluted", "total_stockholders_equity", "outstanding_shares", "price"),
         category="composite",
     ),
     # ── Magic Formula components ─────────────────────────────────────

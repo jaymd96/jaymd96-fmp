@@ -451,12 +451,6 @@ def test_valuation_multiples(httpx_mock):
         ],
     )
     httpx_mock.add_response(
-        url=_url("quote"),
-        json=[
-            _quote(market_cap=2_000_000_000_000),
-        ],
-    )
-    httpx_mock.add_response(
         url=_url("balance-sheet-statement"),
         json=[
             _balance_sheet(
@@ -702,8 +696,8 @@ def test_composite_altman(httpx_mock):
         ],
     )
     httpx_mock.add_response(
-        url=_url("quote"),
-        json=[_quote(market_cap=mcap)],
+        url=_url("key-metrics"),
+        json=[_key_metrics(symbol="AAPL", date="2023-09-30")],
     )
 
     c = FMPClient(api_key="test", cache_path=None)
@@ -715,6 +709,9 @@ def test_composite_altman(httpx_mock):
         .execute()
     )
 
+    # market_cap from key_metrics mock is 2_000_000_000_000
+    km_mcap = 2_000_000_000_000
+
     assert len(df) >= 1
     z = df["altman_z_score"][0]
     assert z is not None
@@ -722,7 +719,7 @@ def test_composite_altman(httpx_mock):
     x1 = (tca - tcl) / ta
     x2 = re / ta
     x3 = (ebitda - da) / ta
-    x4 = mcap / tl
+    x4 = km_mcap / tl
     x5 = rev / ta
     expected_z = 1.2 * x1 + 1.4 * x2 + 3.3 * x3 + 0.6 * x4 + 1.0 * x5
 
@@ -1046,8 +1043,13 @@ def test_per_share(httpx_mock):
         ],
     )
     httpx_mock.add_response(
-        url=_url("quote"),
-        json=[_quote(shares_outstanding=so)],
+        url=_url("shares-float"),
+        json=[{
+            "symbol": "AAPL",
+            "freeFloat": 99.5,
+            "floatShares": int(so * 0.99),
+            "outstandingShares": so,
+        }],
     )
 
     c = FMPClient(api_key="test", cache_path=None)

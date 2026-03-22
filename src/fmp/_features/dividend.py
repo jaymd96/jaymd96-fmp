@@ -31,15 +31,15 @@ FEATURES = [
     ),
     _d(
         "buyback_yield",
-        "ABS(share_repurchase) / NULLIF(quote_market_cap, 0)",
-        ("share_repurchase", "quote_market_cap"),
+        "ABS(share_repurchase) / NULLIF(market_cap, 0)",
+        ("share_repurchase", "market_cap"),
         category="dividend",
     ),
     _d(
         "shareholder_yield_total",
         "(ABS(dividends_paid) + ABS(share_repurchase))"
-        " / NULLIF(quote_market_cap, 0)",
-        ("dividends_paid", "share_repurchase", "quote_market_cap"),
+        " / NULLIF(market_cap, 0)",
+        ("dividends_paid", "share_repurchase", "market_cap"),
         category="dividend",
     ),
     _d(

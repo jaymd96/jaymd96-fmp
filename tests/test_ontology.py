@@ -23,14 +23,14 @@ def test_field_registry_populated():
     assert FIELD_REGISTRY["close"][0] == "daily_price"
     assert FIELD_REGISTRY["revenue"][0] == "income_statement"
     assert FIELD_REGISTRY["price"][0] == "quote"
-    assert FIELD_REGISTRY["pe_ratio"][0] == "key_metrics"
+    assert FIELD_REGISTRY["price_earnings_ratio"][0] == "ratios"
 
 
 def test_field_conflicts_resolved():
     """Canonical owner wins bare name; others are prefixed."""
-    # eps → income_statement; quote gets quote_eps
+    # eps → income_statement; quote gets quote_change_pct
     assert FIELD_REGISTRY["eps"][0] == "income_statement"
-    assert FIELD_REGISTRY["quote_eps"][0] == "quote"
+    assert FIELD_REGISTRY["quote_change_pct"][0] == "quote"
     # volume → daily_price; quote gets quote_volume
     assert FIELD_REGISTRY["volume"][0] == "daily_price"
     assert FIELD_REGISTRY["quote_volume"][0] == "quote"

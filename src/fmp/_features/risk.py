@@ -68,8 +68,8 @@ FEATURES = [
     # ── Volume ────────────────────────────────────────────────────────
     _d(
         "volume_to_avg",
-        "quote_volume / NULLIF(avg_volume, 0)",
-        ("quote_volume", "avg_volume"),
+        "quote_volume / NULLIF(quote_volume, 0)",
+        ("quote_volume", "quote_volume"),
         category="risk",
     ),
     # ── Intraday range ────────────────────────────────────────────────

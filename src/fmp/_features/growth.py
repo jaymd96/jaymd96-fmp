@@ -144,9 +144,9 @@ FEATURES = [
     ),
     _d(
         "market_cap_growth",
-        "(quote_market_cap - LAG(quote_market_cap) OVER w)"
-        " / NULLIF(ABS(LAG(quote_market_cap) OVER w), 0)",
-        ("quote_market_cap",),
+        "(market_cap - LAG(market_cap) OVER w)"
+        " / NULLIF(ABS(LAG(market_cap) OVER w), 0)",
+        ("market_cap",),
         category="growth",
         lag=True,
     ),

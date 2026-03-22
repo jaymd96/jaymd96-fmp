@@ -19,33 +19,33 @@ FEATURES = [
     ),
     _d(
         "bvps",
-        "total_stockholders_equity / NULLIF(shares_outstanding, 0)",
-        ("total_stockholders_equity", "shares_outstanding"),
+        "total_stockholders_equity / NULLIF(outstanding_shares, 0)",
+        ("total_stockholders_equity", "outstanding_shares"),
         category="per_share",
     ),
     _d(
         "tbvps",
         "(total_stockholders_equity - goodwill_and_intangibles)"
-        " / NULLIF(shares_outstanding, 0)",
-        ("total_stockholders_equity", "goodwill_and_intangibles", "shares_outstanding"),
+        " / NULLIF(outstanding_shares, 0)",
+        ("total_stockholders_equity", "goodwill_and_intangibles", "outstanding_shares"),
         category="per_share",
     ),
     _d(
         "revenue_per_share_derived",
-        "revenue / NULLIF(shares_outstanding, 0)",
-        ("revenue", "shares_outstanding"),
+        "revenue / NULLIF(outstanding_shares, 0)",
+        ("revenue", "outstanding_shares"),
         category="per_share",
     ),
     _d(
         "ocf_per_share",
-        "operating_cash_flow / NULLIF(shares_outstanding, 0)",
-        ("operating_cash_flow", "shares_outstanding"),
+        "operating_cash_flow / NULLIF(outstanding_shares, 0)",
+        ("operating_cash_flow", "outstanding_shares"),
         category="per_share",
     ),
     _d(
         "fcf_per_share",
-        "free_cash_flow / NULLIF(shares_outstanding, 0)",
-        ("free_cash_flow", "shares_outstanding"),
+        "free_cash_flow / NULLIF(outstanding_shares, 0)",
+        ("free_cash_flow", "outstanding_shares"),
         category="per_share",
     ),
     _d(
@@ -56,14 +56,14 @@ FEATURES = [
     ),
     _d(
         "net_cash_per_share",
-        "(cash_and_equivalents - total_debt) / NULLIF(shares_outstanding, 0)",
-        ("cash_and_equivalents", "total_debt", "shares_outstanding"),
+        "(cash_and_equivalents - total_debt) / NULLIF(outstanding_shares, 0)",
+        ("cash_and_equivalents", "total_debt", "outstanding_shares"),
         category="per_share",
     ),
     _d(
         "ev_per_share_derived",
-        "enterprise_value / NULLIF(shares_outstanding, 0)",
-        ("enterprise_value", "shares_outstanding"),
+        "enterprise_value / NULLIF(outstanding_shares, 0)",
+        ("enterprise_value", "outstanding_shares"),
         category="per_share",
     ),
     _d(

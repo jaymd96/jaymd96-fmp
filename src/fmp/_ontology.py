@@ -95,26 +95,22 @@ _INCOME_STATEMENT = DatasetDef(
     fields={
         "reported_currency":   _f("reported_currency",   "reportedCurrency", "VARCHAR"),
         "cik":                 _f("cik",                 "cik",              "VARCHAR"),
-        "filling_date":        _f("filling_date",        "fillingDate",      "DATE"),
+        "filling_date":        _f("filling_date",        "filingDate",       "DATE"),
         "accepted_date":       _f("accepted_date",       "acceptedDate",     "VARCHAR"),
-        "calendar_year":       _f("calendar_year",       "calendarYear",     "VARCHAR"),
+        "calendar_year":       _f("calendar_year",       "fiscalYear",       "VARCHAR"),
         "revenue":             _f("revenue",             "revenue",          "BIGINT", agg="sum"),
         "cost_of_revenue":     _f("cost_of_revenue",     "costOfRevenue",    "BIGINT", agg="sum"),
         "gross_profit":        _f("gross_profit",        "grossProfit",      "BIGINT", agg="sum"),
-        "gross_profit_ratio":  _f("gross_profit_ratio",  "grossProfitRatio", agg="mean"),
         "rd_expenses":         _f("rd_expenses",         "researchAndDevelopmentExpenses", "BIGINT", agg="sum"),
         "sga_expenses":        _f("sga_expenses",        "sellingGeneralAndAdministrativeExpenses", "BIGINT", agg="sum"),
         "operating_expenses":  _f("operating_expenses",  "operatingExpenses","BIGINT", agg="sum"),
         "operating_income":    _f("operating_income",    "operatingIncome",  "BIGINT", agg="sum"),
-        "operating_income_ratio": _f("operating_income_ratio", "operatingIncomeRatio", agg="mean"),
         "interest_income":     _f("interest_income",     "interestIncome",   "BIGINT", agg="sum"),
         "interest_expense":    _f("interest_expense",    "interestExpense",  "BIGINT", agg="sum"),
         "ebitda":              _f("ebitda",              "ebitda",           "BIGINT", agg="sum"),
-        "ebitda_ratio":        _f("ebitda_ratio",        "ebitdaratio",      agg="mean"),
         "net_income":          _f("net_income",          "netIncome",        "BIGINT", agg="sum"),
-        "net_income_ratio":    _f("net_income_ratio",    "netIncomeRatio",   agg="mean"),
         "eps":                 _f("eps",                 "eps",              agg="sum"),
-        "eps_diluted":         _f("eps_diluted",         "epsdiluted",       agg="sum"),
+        "eps_diluted":         _f("eps_diluted",         "epsDiluted",       agg="sum"),
         "weighted_avg_shares": _f("weighted_avg_shares", "weightedAverageShsOut", "BIGINT", agg="last"),
         "weighted_avg_shares_diluted": _f("weighted_avg_shares_diluted", "weightedAverageShsOutDil", "BIGINT", agg="last"),
         "income_before_tax":   _f("income_before_tax",   "incomeBeforeTax",  "BIGINT", agg="sum"),
@@ -123,8 +119,6 @@ _INCOME_STATEMENT = DatasetDef(
         "cost_and_expenses":   _f("cost_and_expenses",   "costAndExpenses",  "BIGINT", agg="sum"),
         "other_expenses":      _f("other_expenses",      "otherExpenses",    "BIGINT", agg="sum"),
         "total_other_income":  _f("total_other_income",  "totalOtherIncomeExpensesNet", "BIGINT", agg="sum"),
-        "link":                _f("link",                "link",             "VARCHAR"),
-        "final_link":          _f("final_link",          "finalLink",        "VARCHAR"),
     },
 )
 
@@ -137,8 +131,8 @@ _BALANCE_SHEET = DatasetDef(
     fields={
         "reported_currency":         _f("reported_currency",         "reportedCurrency",         "VARCHAR"),
         "cik":                       _f("cik",                       "cik",                      "VARCHAR"),
-        "filling_date":              _f("filling_date",              "fillingDate",              "DATE"),
-        "calendar_year":             _f("calendar_year",             "calendarYear",             "VARCHAR"),
+        "filling_date":              _f("filling_date",              "filingDate",               "DATE"),
+        "calendar_year":             _f("calendar_year",             "fiscalYear",               "VARCHAR"),
         "cash_and_equivalents":      _f("cash_and_equivalents",      "cashAndCashEquivalents",   "BIGINT"),
         "short_term_investments":    _f("short_term_investments",    "shortTermInvestments",     "BIGINT"),
         "net_receivables":           _f("net_receivables",           "netReceivables",           "BIGINT"),
@@ -157,7 +151,7 @@ _BALANCE_SHEET = DatasetDef(
         "total_liabilities":         _f("total_liabilities",         "totalLiabilities",         "BIGINT"),
         "total_stockholders_equity": _f("total_stockholders_equity", "totalStockholdersEquity",  "BIGINT"),
         "total_equity":              _f("total_equity",              "totalEquity",              "BIGINT"),
-        "total_liabilities_and_equity": _f("total_liabilities_and_equity", "totalLiabilitiesAndStockholdersEquity", "BIGINT"),
+        "total_liabilities_and_equity": _f("total_liabilities_and_equity", "totalLiabilitiesAndTotalEquity", "BIGINT"),
         "total_debt":                _f("total_debt",                "totalDebt",                "BIGINT"),
         "net_debt":                  _f("net_debt",                  "netDebt",                  "BIGINT"),
         "retained_earnings":         _f("retained_earnings",         "retainedEarnings",         "BIGINT"),
@@ -184,19 +178,19 @@ _CASH_FLOW = DatasetDef(
     fields={
         "reported_currency":      _f("reported_currency",      "reportedCurrency",           "VARCHAR"),
         "cik":                    _f("cik",                    "cik",                        "VARCHAR"),
-        "filling_date":           _f("filling_date",           "fillingDate",                "DATE"),
-        "calendar_year":          _f("calendar_year",          "calendarYear",               "VARCHAR"),
+        "filling_date":           _f("filling_date",           "filingDate",                 "DATE"),
+        "calendar_year":          _f("calendar_year",          "fiscalYear",                 "VARCHAR"),
         "net_income_cf":          _f("net_income_cf",          "netIncome",                  "BIGINT", agg="sum"),
         "depreciation":           _f("depreciation",           "depreciationAndAmortization","BIGINT", agg="sum"),
         "stock_based_compensation": _f("stock_based_compensation", "stockBasedCompensation", "BIGINT", agg="sum"),
         "operating_cash_flow":    _f("operating_cash_flow",    "operatingCashFlow",          "BIGINT", agg="sum"),
         "capex":                  _f("capex",                  "capitalExpenditure",         "BIGINT", agg="sum"),
         "acquisitions":           _f("acquisitions",           "acquisitionsNet",            "BIGINT", agg="sum"),
-        "investing_cash_flow":    _f("investing_cash_flow",    "netCashUsedForInvestingActivites", "BIGINT", agg="sum"),
+        "investing_cash_flow":    _f("investing_cash_flow",    "netCashProvidedByInvestingActivities", "BIGINT", agg="sum"),
         "debt_repayment":         _f("debt_repayment",         "debtRepayment",              "BIGINT", agg="sum"),
         "share_repurchase":       _f("share_repurchase",       "commonStockRepurchased",     "BIGINT", agg="sum"),
-        "dividends_paid":         _f("dividends_paid",         "dividendsPaid",              "BIGINT", agg="sum"),
-        "financing_cash_flow":    _f("financing_cash_flow",    "netCashUsedProvidedByFinancingActivities", "BIGINT", agg="sum"),
+        "dividends_paid":         _f("dividends_paid",         "commonDividendsPaid",              "BIGINT", agg="sum"),
+        "financing_cash_flow":    _f("financing_cash_flow",    "netCashProvidedByFinancingActivities", "BIGINT", agg="sum"),
         "free_cash_flow":         _f("free_cash_flow",         "freeCashFlow",               "BIGINT", agg="sum"),
         "net_change_in_cash":     _f("net_change_in_cash",     "netChangeInCash",            "BIGINT", agg="sum"),
     },
@@ -209,31 +203,28 @@ _KEY_METRICS = DatasetDef(
     keys=("symbol", "date", "period"),
     ttl_category="key_metrics",
     fields={
-        "calendar_year":       _f("calendar_year",       "calendarYear",            "VARCHAR"),
-        "revenue_per_share":   _f("revenue_per_share",   "revenuePerShare",         agg="last"),
-        "net_income_per_share":_f("net_income_per_share", "netIncomePerShare",       agg="last"),
-        "operating_cf_per_share": _f("operating_cf_per_share", "operatingCashFlowPerShare", agg="last"),
-        "fcf_per_share":       _f("fcf_per_share",       "freeCashFlowPerShare",    agg="last"),
-        "cash_per_share":      _f("cash_per_share",      "cashPerShare",            agg="last"),
-        "book_value_per_share":_f("book_value_per_share", "bookValuePerShare",       agg="last"),
+        "calendar_year":       _f("calendar_year",       "fiscalYear",              "VARCHAR"),
         "market_cap":          _f("market_cap",          "marketCap",               "BIGINT", agg="last"),
         "enterprise_value":    _f("enterprise_value",    "enterpriseValue",         "BIGINT", agg="last"),
-        "pe_ratio":            _f("pe_ratio",            "peRatio",                 agg="last"),
-        "price_to_sales":      _f("price_to_sales",      "priceToSalesRatio",       agg="last"),
-        "pb_ratio":            _f("pb_ratio",            "pbRatio",                 agg="last"),
         "ev_to_sales":         _f("ev_to_sales",         "evToSales",               agg="last"),
-        "ev_to_ebitda":        _f("ev_to_ebitda",        "enterpriseValueOverEBITDA", agg="last"),
+        "ev_to_ebitda":        _f("ev_to_ebitda",        "evToEBITDA",              agg="last"),
         "ev_to_fcf":           _f("ev_to_fcf",           "evToFreeCashFlow",        agg="last"),
         "earnings_yield":      _f("earnings_yield",      "earningsYield",           agg="last"),
         "fcf_yield":           _f("fcf_yield",           "freeCashFlowYield",       agg="last"),
-        "debt_to_equity":      _f("debt_to_equity",      "debtToEquity",            agg="last"),
-        "debt_to_assets":      _f("debt_to_assets",      "debtToAssets",            agg="last"),
         "current_ratio":       _f("current_ratio",       "currentRatio",            agg="last"),
-        "dividend_yield":      _f("dividend_yield",      "dividendYield",           agg="last"),
-        "payout_ratio":        _f("payout_ratio",        "payoutRatio",             agg="last"),
-        "roic":                _f("roic",                "roic",                    agg="last"),
-        "roe":                 _f("roe",                 "roe",                     agg="last"),
-        "roa":                 _f("roa",                 "roa",                     agg="last"),
+        "roic":                _f("roic",                "returnOnInvestedCapital",  agg="last"),
+        "roe":                 _f("roe",                 "returnOnEquity",          agg="last"),
+        "roa":                 _f("roa",                 "returnOnAssets",          agg="last"),
+        "tax_burden_km":       _f("tax_burden_km",       "taxBurden",               agg="last"),
+        "interest_burden_km":  _f("interest_burden_km",  "interestBurden",          agg="last"),
+        "operating_return_on_assets_km": _f("operating_return_on_assets_km", "operatingReturnOnAssets", agg="last"),
+        "return_on_capital_employed_km": _f("return_on_capital_employed_km", "returnOnCapitalEmployed", agg="last"),
+        "return_on_tangible_assets_km":  _f("return_on_tangible_assets_km", "returnOnTangibleAssets",  agg="last"),
+        "net_debt_to_ebitda_km": _f("net_debt_to_ebitda_km", "netDebtToEBITDA",     agg="last"),
+        "invested_capital":    _f("invested_capital",    "investedCapital",         "BIGINT", agg="last"),
+        "working_capital_km":  _f("working_capital_km",  "workingCapital",          "BIGINT", agg="last"),
+        "graham_number_km":    _f("graham_number_km",    "grahamNumber",            agg="last"),
+        "income_quality":      _f("income_quality",      "incomeQuality",           agg="last"),
     },
 )
 
@@ -244,16 +235,12 @@ _RATIOS = DatasetDef(
     keys=("symbol", "date", "period"),
     ttl_category="key_metrics",
     fields={
-        "calendar_year":        _f("calendar_year",        "calendarYear",             "VARCHAR"),
         "gross_profit_margin":  _f("gross_profit_margin",  "grossProfitMargin",        agg="last"),
         "operating_profit_margin": _f("operating_profit_margin", "operatingProfitMargin", agg="last"),
         "net_profit_margin":    _f("net_profit_margin",    "netProfitMargin",          agg="last"),
-        "return_on_assets":     _f("return_on_assets",     "returnOnAssets",           agg="last"),
-        "return_on_equity":     _f("return_on_equity",     "returnOnEquity",           agg="last"),
-        "return_on_capital":    _f("return_on_capital",     "returnOnCapitalEmployed",  agg="last"),
-        "debt_ratio":           _f("debt_ratio",           "debtRatio",                agg="last"),
-        "debt_equity_ratio":    _f("debt_equity_ratio",    "debtEquityRatio",          agg="last"),
-        "interest_coverage":    _f("interest_coverage",    "interestCoverage",         agg="last"),
+        "debt_ratio":           _f("debt_ratio",           "debtToAssetsRatio",        agg="last"),
+        "debt_equity_ratio":    _f("debt_equity_ratio",    "debtToEquityRatio",        agg="last"),
+        "interest_coverage":    _f("interest_coverage",    "interestCoverageRatio",    agg="last"),
         "cash_flow_to_debt":    _f("cash_flow_to_debt",    "cashFlowToDebtRatio",      agg="last"),
         "current_ratio_r":      _f("current_ratio_r",      "currentRatio",             agg="last"),
         "quick_ratio":          _f("quick_ratio",          "quickRatio",               agg="last"),
@@ -262,11 +249,21 @@ _RATIOS = DatasetDef(
         "inventory_turnover":   _f("inventory_turnover",   "inventoryTurnover",        agg="last"),
         "receivables_turnover": _f("receivables_turnover", "receivablesTurnover",      agg="last"),
         "dividend_yield_r":     _f("dividend_yield_r",     "dividendYield",            agg="last"),
-        "price_earnings_ratio": _f("price_earnings_ratio", "priceEarningsRatio",       agg="last"),
+        "price_earnings_ratio": _f("price_earnings_ratio", "priceToEarningsRatio",     agg="last"),
         "price_to_book":        _f("price_to_book",        "priceToBookRatio",         agg="last"),
         "price_to_sales_r":     _f("price_to_sales_r",     "priceToSalesRatio",        agg="last"),
-        "price_to_fcf":         _f("price_to_fcf",         "priceToFreeCashFlowsRatio", agg="last"),
+        "price_to_fcf":         _f("price_to_fcf",         "priceToFreeCashFlowRatio", agg="last"),
         "ev_to_sales_r":        _f("ev_to_sales_r",        "enterpriseValueMultiple",  agg="last"),
+        "revenue_per_share_r":  _f("revenue_per_share_r",  "revenuePerShare",          agg="last"),
+        "net_income_per_share_r": _f("net_income_per_share_r", "netIncomePerShare",    agg="last"),
+        "book_value_per_share_r": _f("book_value_per_share_r", "bookValuePerShare",    agg="last"),
+        "fcf_per_share_r":      _f("fcf_per_share_r",      "freeCashFlowPerShare",     agg="last"),
+        "operating_cf_per_share_r": _f("operating_cf_per_share_r", "operatingCashFlowPerShare", agg="last"),
+        "cash_per_share_r":     _f("cash_per_share_r",     "cashPerShare",             agg="last"),
+        "tangible_bvps_r":      _f("tangible_bvps_r",      "tangibleBookValuePerShare", agg="last"),
+        "dividend_per_share_r": _f("dividend_per_share_r", "dividendPerShare",         agg="last"),
+        "ebitda_margin_r":      _f("ebitda_margin_r",      "ebitdaMargin",             agg="last"),
+        "effective_tax_rate_r": _f("effective_tax_rate_r",  "effectiveTaxRate",         agg="last"),
     },
 )
 
@@ -280,7 +277,7 @@ _QUOTE = DatasetDef(
         "quote_name":           _f("quote_name",           "name",               "VARCHAR"),
         "price":                _f("price",                "price"),
         "quote_change":         _f("quote_change",         "change"),
-        "quote_change_pct":     _f("quote_change_pct",     "changesPercentage"),
+        "quote_change_pct":     _f("quote_change_pct",     "changePercentage"),
         "day_low":              _f("day_low",              "dayLow"),
         "day_high":             _f("day_high",             "dayHigh"),
         "year_low":             _f("year_low",             "yearLow"),
@@ -289,12 +286,8 @@ _QUOTE = DatasetDef(
         "price_avg_50":         _f("price_avg_50",         "priceAvg50"),
         "price_avg_200":        _f("price_avg_200",        "priceAvg200"),
         "quote_volume":         _f("quote_volume",         "volume",             "BIGINT"),
-        "avg_volume":           _f("avg_volume",           "avgVolume",          "BIGINT"),
         "quote_open":           _f("quote_open",           "open"),
         "previous_close":       _f("previous_close",       "previousClose"),
-        "quote_eps":            _f("quote_eps",            "eps"),
-        "quote_pe":             _f("quote_pe",             "pe"),
-        "shares_outstanding":   _f("shares_outstanding",   "sharesOutstanding",  "BIGINT"),
         "exchange":             _f("exchange",             "exchange",           "VARCHAR"),
     },
 )
@@ -628,6 +621,40 @@ for _ds in DATASETS.values():
     for _field in _ds.fields.values():
         if _field.name not in FIELD_REGISTRY:
             FIELD_REGISTRY[_field.name] = (_ds.name, _field)
+
+# ── Aliases: convenient short names that map to fields in their correct dataset ──
+# These let users write .select("pe_ratio") instead of .select("price_earnings_ratio")
+_ALIASES: dict[str, str] = {
+    # key_metrics fields that moved to ratios
+    "pe_ratio":          "price_earnings_ratio",
+    "pb_ratio":          "price_to_book",
+    "price_to_sales":    "price_to_sales_r",
+    "debt_to_equity":    "debt_equity_ratio",
+    "debt_to_assets":    "debt_ratio",
+    "dividend_yield":    "dividend_yield_r",
+    "payout_ratio":      "dividend_per_share_r",  # closest available
+    "revenue_per_share": "revenue_per_share_r",
+    "net_income_per_share": "net_income_per_share_r",
+    "book_value_per_share": "book_value_per_share_r",
+    "fcf_per_share":     "fcf_per_share_r",
+    "cash_per_share":    "cash_per_share_r",
+    "operating_cf_per_share": "operating_cf_per_share_r",
+    # quote fields that moved elsewhere
+    "shares_outstanding": "outstanding_shares",   # shares_float_data
+    "avg_volume":        "quote_volume",           # quote (closest)
+    "quote_pe":          "price_earnings_ratio",   # ratios
+    "quote_eps":         "eps",                    # income_statement
+    # income statement ratios (now in ratios endpoint or computable)
+    "gross_profit_ratio":     "gross_profit_margin",  # ratios endpoint
+    "operating_income_ratio": "operating_profit_margin",  # ratios
+    "ebitda_ratio":           "ebitda_margin_r",
+    "net_income_ratio":       "net_profit_margin",  # ratios
+}
+
+# Register aliases — point them to the same (dataset, FieldDef) as the target
+for _alias, _target in _ALIASES.items():
+    if _alias not in FIELD_REGISTRY and _target in FIELD_REGISTRY:
+        FIELD_REGISTRY[_alias] = FIELD_REGISTRY[_target]
 
 
 def resolve_fields(

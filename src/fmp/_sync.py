@@ -48,7 +48,8 @@ BULK_YEARLY_NO_PERIOD: dict[str, tuple[str, bool]] = {
 # dataset → batch_endpoint
 # One call returns all symbols (snapshot)
 BATCH_ALL: dict[str, str] = {
-    "quote": "batch-request-end-of-day-prices",
+    # Note: batch-request-end-of-day-prices returns 404 on some plans.
+    # quote is handled as PER_SYMBOL_SNAPSHOT as fallback.
 }
 
 # Datasets with no bulk — must fetch per-symbol, but have date range
@@ -62,7 +63,7 @@ DATE_ONLY = {"treasury_rates"}
 
 # Snapshot datasets without bulk — fetch per symbol, no date range
 PER_SYMBOL_SNAPSHOT = {
-    "dcf_data", "esg_data", "price_change",
+    "quote", "dcf_data", "esg_data", "price_change",
     "institutional_summary", "price_target", "grades_consensus", "ratings",
     "shares_float_data",
 }

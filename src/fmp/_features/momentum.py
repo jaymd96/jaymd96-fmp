@@ -76,8 +76,8 @@ FEATURES = [
     _d(
         "volume_price_confirmation",
         "((close - LAG(close) OVER w) / NULLIF(LAG(close) OVER w, 0))"
-        " * (volume / NULLIF(avg_volume, 0))",
-        ("close", "volume", "avg_volume"),
+        " * (volume / NULLIF(quote_volume, 0))",
+        ("close", "volume", "quote_volume"),
         category="momentum",
         lag=True,
     ),

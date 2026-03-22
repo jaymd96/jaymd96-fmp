@@ -8,8 +8,8 @@ FEATURES = [
     # ── Price multiples ────────────────────────────────────────────
     _d(
         "pe_derived",
-        "quote_market_cap / NULLIF(net_income, 0)",
-        ("quote_market_cap", "net_income"),
+        "market_cap / NULLIF(net_income, 0)",
+        ("market_cap", "net_income"),
         category="valuation",
     ),
     _d(
@@ -22,22 +22,22 @@ FEATURES = [
     ),
     _d(
         "price_to_sales_derived",
-        "quote_market_cap / NULLIF(revenue, 0)",
-        ("quote_market_cap", "revenue"),
+        "market_cap / NULLIF(revenue, 0)",
+        ("market_cap", "revenue"),
         category="valuation",
     ),
     _d(
         "price_to_book",
-        "quote_market_cap / NULLIF(total_stockholders_equity, 0)",
-        ("quote_market_cap", "total_stockholders_equity"),
+        "market_cap / NULLIF(total_stockholders_equity, 0)",
+        ("market_cap", "total_stockholders_equity"),
         category="valuation",
     ),
     _d(
         "price_to_tangible_book",
-        "quote_market_cap"
+        "market_cap"
         " / NULLIF(total_stockholders_equity - goodwill_and_intangibles, 0)",
         (
-            "quote_market_cap",
+            "market_cap",
             "total_stockholders_equity",
             "goodwill_and_intangibles",
         ),
@@ -45,14 +45,14 @@ FEATURES = [
     ),
     _d(
         "price_to_cf",
-        "quote_market_cap / NULLIF(operating_cash_flow, 0)",
-        ("quote_market_cap", "operating_cash_flow"),
+        "market_cap / NULLIF(operating_cash_flow, 0)",
+        ("market_cap", "operating_cash_flow"),
         category="valuation",
     ),
     _d(
         "price_to_fcf",
-        "quote_market_cap / NULLIF(free_cash_flow, 0)",
-        ("quote_market_cap", "free_cash_flow"),
+        "market_cap / NULLIF(free_cash_flow, 0)",
+        ("market_cap", "free_cash_flow"),
         category="valuation",
     ),
     # ── EV multiples ───────────────────────────────────────────────
@@ -102,29 +102,29 @@ FEATURES = [
     # ── Yield metrics ──────────────────────────────────────────────
     _d(
         "earnings_yield_derived",
-        "net_income / NULLIF(quote_market_cap, 0)",
-        ("net_income", "quote_market_cap"),
+        "net_income / NULLIF(market_cap, 0)",
+        ("net_income", "market_cap"),
         category="valuation",
     ),
     _d(
         "fcf_yield_derived",
-        "free_cash_flow / NULLIF(quote_market_cap, 0)",
-        ("free_cash_flow", "quote_market_cap"),
+        "free_cash_flow / NULLIF(market_cap, 0)",
+        ("free_cash_flow", "market_cap"),
         category="valuation",
     ),
     _d(
         "shareholder_yield",
         "(-share_repurchase - dividends_paid)"
-        " / NULLIF(quote_market_cap, 0)",
-        ("share_repurchase", "dividends_paid", "quote_market_cap"),
+        " / NULLIF(market_cap, 0)",
+        ("share_repurchase", "dividends_paid", "market_cap"),
         category="valuation",
     ),
     # ── Composite / other ──────────────────────────────────────────
     _d(
         "tobins_q",
-        "(quote_market_cap + total_liabilities)"
+        "(market_cap + total_liabilities)"
         " / NULLIF(total_assets, 0)",
-        ("quote_market_cap", "total_liabilities", "total_assets"),
+        ("market_cap", "total_liabilities", "total_assets"),
         category="valuation",
     ),
     _d(
@@ -135,10 +135,10 @@ FEATURES = [
     ),
     _d(
         "price_to_working_capital",
-        "quote_market_cap"
+        "market_cap"
         " / NULLIF(total_current_assets - total_current_liabilities, 0)",
         (
-            "quote_market_cap",
+            "market_cap",
             "total_current_assets",
             "total_current_liabilities",
         ),

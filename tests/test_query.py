@@ -80,12 +80,13 @@ def test_single_dataset_snapshot(query_client, httpx_mock):
 
     df = (query_client.query()
           .symbols("AAPL")
-          .select("price", "quote_pe")
+          .select("price", "day_high")
           .execute())
 
     assert isinstance(df, pl.DataFrame)
     assert len(df) == 1
     assert df["price"][0] == 182.52
+    assert df["day_high"][0] == 183.0
 
 
 # ── Cross-dataset queries ────────────────────────────────────────────
