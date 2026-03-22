@@ -578,6 +578,72 @@ _FINANCIAL_SCORES = DatasetDef(
     },
 )
 
+# ──────────────────────────────────────────────────────────────────────
+# Historical datasets (point-in-time correct for backtesting)
+# ──────────────────────────────────────────────────────────────────────
+
+_HISTORICAL_MARKET_CAP = DatasetDef(
+    name="historical_market_cap",
+    endpoint="historical-market-capitalization",
+    grain=Grain.DAILY,
+    keys=("symbol", "date"),
+    ttl_category="daily_historical",
+    fields={
+        "hist_market_cap": _f("hist_market_cap", "marketCap", "BIGINT"),
+    },
+)
+
+_HISTORICAL_GRADES = DatasetDef(
+    name="historical_grades",
+    endpoint="grades-historical",
+    grain=Grain.MONTHLY,
+    keys=("symbol", "date"),
+    ttl_category="analyst",
+    fields={
+        "hist_strong_buy":  _f("hist_strong_buy",  "analystRatingsStrongBuy",  "INTEGER"),
+        "hist_buy":         _f("hist_buy",         "analystRatingsBuy",        "INTEGER"),
+        "hist_hold":        _f("hist_hold",        "analystRatingsHold",       "INTEGER"),
+        "hist_sell":        _f("hist_sell",         "analystRatingsSell",       "INTEGER"),
+        "hist_strong_sell": _f("hist_strong_sell",  "analystRatingsStrongSell", "INTEGER"),
+    },
+)
+
+_HISTORICAL_RATINGS = DatasetDef(
+    name="historical_ratings",
+    endpoint="ratings-historical",
+    grain=Grain.MONTHLY,
+    keys=("symbol", "date"),
+    ttl_category="analyst",
+    fields={
+        "hist_rating":         _f("hist_rating",         "rating",                    "VARCHAR"),
+        "hist_overall_score":  _f("hist_overall_score",  "overallScore",              "INTEGER"),
+        "hist_dcf_score":      _f("hist_dcf_score",      "discountedCashFlowScore",   "INTEGER"),
+        "hist_roe_score":      _f("hist_roe_score",      "returnOnEquityScore",       "INTEGER"),
+        "hist_roa_score":      _f("hist_roa_score",      "returnOnAssetsScore",       "INTEGER"),
+        "hist_de_score":       _f("hist_de_score",       "debtToEquityScore",         "INTEGER"),
+        "hist_pe_score":       _f("hist_pe_score",       "priceToEarningsScore",      "INTEGER"),
+        "hist_pb_score":       _f("hist_pb_score",       "priceToBookScore",          "INTEGER"),
+    },
+)
+
+_HISTORICAL_INSTITUTIONAL = DatasetDef(
+    name="historical_institutional",
+    endpoint="institutional-ownership/symbol-positions-summary",
+    grain=Grain.QUARTERLY,
+    keys=("symbol", "date"),
+    ttl_category="sec_filings",
+    fields={
+        "hist_inst_holders":          _f("hist_inst_holders",          "investorsHolding",        "INTEGER"),
+        "hist_inst_holders_change":   _f("hist_inst_holders_change",  "investorsHoldingChange",  "INTEGER"),
+        "hist_inst_invested":         _f("hist_inst_invested",        "totalInvested",           "BIGINT"),
+        "hist_inst_invested_change":  _f("hist_inst_invested_change", "totalInvestedChange",     "BIGINT"),
+        "hist_inst_ownership_pct":    _f("hist_inst_ownership_pct",   "ownershipPercent"),
+        "hist_inst_new_positions":    _f("hist_inst_new_positions",   "newPositions",            "INTEGER"),
+        "hist_inst_closed_positions": _f("hist_inst_closed_positions","closedPositions",         "INTEGER"),
+        "hist_inst_put_call_ratio":   _f("hist_inst_put_call_ratio",  "putCallRatio"),
+    },
+)
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Registry
@@ -610,6 +676,10 @@ DATASETS: dict[str, DatasetDef] = {
         _RATINGS,
         _EMPLOYEE_COUNT,
         _SHARES_FLOAT,
+        _HISTORICAL_MARKET_CAP,
+        _HISTORICAL_GRADES,
+        _HISTORICAL_RATINGS,
+        _HISTORICAL_INSTITUTIONAL,
     ]
 }
 

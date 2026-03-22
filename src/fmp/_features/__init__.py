@@ -26,12 +26,14 @@ from fmp._features.sector_relative import FEATURES as _sector_relative
 from fmp._features.event_driven import FEATURES as _event_driven
 from fmp._features.esg import FEATURES as _esg
 from fmp._features.institutional import FEATURES as _institutional
+from fmp._features.historical import FEATURES as _historical
 
 _ALL_FEATURES: list[DerivedFieldDef] = (
     _profitability + _liquidity + _leverage + _efficiency + _valuation
     + _cash_flow + _growth + _dupont + _earnings_quality + _per_share
     + _dividend + _risk + _technical + _momentum + _composite + _analyst
     + _macro + _sector_relative + _event_driven + _esg + _institutional
+    + _historical
 )
 
 DERIVED_REGISTRY: dict[str, DerivedFieldDef] = {f.name: f for f in _ALL_FEATURES}

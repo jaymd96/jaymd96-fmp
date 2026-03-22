@@ -56,6 +56,14 @@ BATCH_ALL: dict[str, str] = {
 PER_SYMBOL_TIMESERIES = {
     "daily_price", "enterprise_values", "earnings_data", "dividends_data",
     "analyst_estimates", "splits_data", "employee_count",
+    "historical_market_cap",  # daily market cap history
+    "historical_grades",      # monthly analyst consensus history
+    "historical_ratings",     # monthly FMP rating history
+}
+
+# Datasets that need custom multi-period sync (iterate year/quarter combos)
+MULTI_PERIOD_DATASETS = {
+    "historical_institutional",  # quarterly institutional ownership history
 }
 
 # Datasets that are date-only (no symbol key) — fetch once
@@ -72,6 +80,8 @@ PER_SYMBOL_SNAPSHOT = {
 EXTRA_PARAMS: dict[str, dict[str, object]] = {
     "institutional_summary": {"year": 2024, "quarter": 4},
     "analyst_estimates": {"period": "annual"},
+    "historical_grades": {"limit": 500},
+    "historical_ratings": {"limit": 500},
 }
 
 
@@ -169,6 +179,10 @@ class SyncManager:
             elif ds_name in PER_SYMBOL_SNAPSHOT:
                 rows = self._sync_per_symbol_snapshot(
                     ds_name, symbols or [], max_workers, _prog
+                )
+            elif ds_name in MULTI_PERIOD_DATASETS and symbols:
+                rows = self._sync_multi_period(
+                    ds_name, symbols, start, end, max_workers, _prog
                 )
             elif ds_name in PER_SYMBOL_TIMESERIES and symbols:
                 rows = self._sync_per_symbol_ts(
@@ -462,6 +476,39 @@ class SyncManager:
             return 0
         progress(f"fetching {len(to_fetch)} symbols...")
         return self._fetch_symbols(ds_name, ds.endpoint, to_fetch, None, None, max_workers)
+
+    def _sync_multi_period(
+        self, ds_name: str, symbols: list[str],
+        start: str | None, end: str | None, max_workers: int,
+        progress: Callable,
+    ) -> int:
+        """Sync datasets that need year/quarter iteration (e.g., historical institutional)."""
+        ds = DATASETS[ds_name]
+        start_year = int(start[:4]) if start else 2020
+        end_year = int(end[:4]) if end else 2025
+        total = 0
+
+        quarters = []
+        for year in range(start_year, end_year + 1):
+            for q in range(1, 5):
+                quarters.append((year, q))
+
+        progress(f"fetching {len(symbols)} symbols × {len(quarters)} quarters...")
+
+        for sym in symbols:
+            for year, quarter in quarters:
+                params = {"symbol": sym, "year": year, "quarter": quarter}
+                try:
+                    rows = self._http.get(ds.endpoint, params=params)
+                    if rows:
+                        for row in rows:
+                            row.setdefault("symbol", sym)
+                        total += self._store.write(ds_name, rows)
+                except Exception:
+                    pass
+
+        progress(f"{total} rows loaded")
+        return total
 
     def _sync_per_symbol_ts(
         self, ds_name: str, symbols: list[str],
