@@ -626,6 +626,20 @@ _HISTORICAL_RATINGS = DatasetDef(
     },
 )
 
+_DELISTED_COMPANIES = DatasetDef(
+    name="delisted_companies",
+    endpoint="delisted-companies",
+    grain=Grain.SNAPSHOT,
+    keys=("symbol",),
+    ttl_category="static_lists",
+    fields={
+        "company_name":   _f("company_name",   "companyName",   "VARCHAR"),
+        "exchange":       _f("delisted_exchange", "exchange",    "VARCHAR"),
+        "ipo_date":       _f("ipo_date",       "ipoDate",       "DATE"),
+        "delisted_date":  _f("delisted_date",  "delistedDate",  "DATE"),
+    },
+)
+
 _HISTORICAL_INSTITUTIONAL = DatasetDef(
     name="historical_institutional",
     endpoint="institutional-ownership/symbol-positions-summary",
@@ -680,6 +694,7 @@ DATASETS: dict[str, DatasetDef] = {
         _HISTORICAL_GRADES,
         _HISTORICAL_RATINGS,
         _HISTORICAL_INSTITUTIONAL,
+        _DELISTED_COMPANIES,
     ]
 }
 

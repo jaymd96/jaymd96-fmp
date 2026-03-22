@@ -33,10 +33,11 @@ BULK_YEARLY: dict[str, tuple[str, bool, bool]] = {
     "ratios": ("ratios-bulk", True, True),
 }
 
-# dataset → (bulk_endpoint, param_name)
+# dataset → (bulk_endpoint, param_name, page_size)
 # Paginated bulk: 1 call per page returns ALL symbols
-BULK_PAGINATED: dict[str, tuple[str, str]] = {
-    "profile": ("profile-bulk", "part"),
+BULK_PAGINATED: dict[str, tuple[str, str, int]] = {
+    "profile": ("profile-bulk", "part", 1000),
+    "delisted_companies": ("delisted-companies", "page", 100),
 }
 
 # dataset → (bulk_endpoint, requires_year)
@@ -417,8 +418,8 @@ class SyncManager:
         return total
 
     def _sync_bulk_paginated(self, ds_name: str, progress: Callable) -> int:
-        """Sync via paginated bulk endpoint (e.g., profile-bulk)."""
-        endpoint, param_name = BULK_PAGINATED[ds_name]
+        """Sync via paginated bulk endpoint (e.g., profile-bulk, delisted-companies)."""
+        endpoint, param_name, page_size = BULK_PAGINATED[ds_name]
         if self._store.row_count(ds_name) > 0:
             progress("already loaded")
             return 0
@@ -428,12 +429,15 @@ class SyncManager:
         while True:
             progress(f"fetching page {part}...")
             try:
-                rows = self._http.get(endpoint, params={param_name: str(part)})
+                params: dict[str, str | int] = {param_name: part}
+                if page_size < 1000:
+                    params["limit"] = page_size
+                rows = self._http.get(endpoint, params=params)
                 if not rows:
                     break
                 total += self._store.write(ds_name, rows)
                 progress(f"page {part}: {len(rows)} rows")
-                if len(rows) < 1000:
+                if len(rows) < page_size:
                     break
                 part += 1
             except Exception as exc:

@@ -170,8 +170,9 @@ def test_sync_all(httpx_mock):
             json=[],
         )
         # financial_scores uses per-symbol (not bulk) — no mock needed here
-    # Paginated profile bulk, treasury rates
+    # Paginated profile bulk, delisted companies, treasury rates
     httpx_mock.add_response(url=re.compile(r".*/profile-bulk.*"), json=[])
+    httpx_mock.add_response(url=re.compile(r".*/delisted-companies.*"), json=[])
     httpx_mock.add_response(url=re.compile(r".*/treasury-rates.*"), json=[])
 
     c = FMPClient(api_key="test", cache_path=None)

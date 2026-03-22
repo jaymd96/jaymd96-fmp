@@ -114,3 +114,18 @@ class DirectoryMixin:
             ttl_category="static_lists",
             force_refresh=force_refresh,
         )
+
+    def delisted_companies(
+        self,
+        *,
+        page: int = 0,
+        limit: int = 100,
+        force_refresh: bool = False,
+    ) -> list[dict]:
+        params: dict = {"page": page, "limit": limit}
+        return self._request(
+            "delisted-companies",
+            params=params,
+            ttl_category="static_lists",
+            force_refresh=force_refresh,
+        )
