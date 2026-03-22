@@ -237,4 +237,27 @@ FEATURES = [
         ("close", "low", "high"),
         category="technical",
     ),
+    # ── Cumulative OBV ──────────────────────────────────────────────────
+    _d(
+        "obv_cumulative",
+        "SUM(CASE WHEN close > LAG(close) OVER w THEN volume"
+        " WHEN close < LAG(close) OVER w THEN -volume ELSE 0 END)"
+        " OVER (PARTITION BY symbol ORDER BY date ROWS UNBOUNDED PRECEDING)",
+        ("close", "volume"),
+        category="technical",
+        dtype="BIGINT",
+        lag=True,
+    ),
+    # ── Chaikin Money Flow (20-day) ─────────────────────────────────────
+    _d(
+        "chaikin_money_flow_20d",
+        "SUM(((close - low) - (high - close)) / NULLIF(high - low, 0) * volume)"
+        " OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)"
+        " / NULLIF(SUM(volume) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 19 PRECEDING AND CURRENT ROW), 0)",
+        ("close", "low", "high", "volume"),
+        category="technical",
+        lag=True,
+    ),
 ]

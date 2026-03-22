@@ -124,4 +124,15 @@ FEATURES = [
         category="earnings_quality",
         lag=True,
     ),
+    # ── Earnings surprise streak (positive surprises in last 4 quarters) ─
+    _d(
+        "earnings_surprise_streak",
+        "SUM(CASE WHEN earnings_eps > eps_estimated THEN 1 ELSE 0 END)"
+        " OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 3 PRECEDING AND CURRENT ROW)",
+        ("earnings_eps", "eps_estimated"),
+        category="earnings_quality",
+        dtype="INTEGER",
+        lag=True,
+    ),
 ]

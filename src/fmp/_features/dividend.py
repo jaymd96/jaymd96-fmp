@@ -74,4 +74,12 @@ FEATURES = [
         category="dividend",
         lag=True,
     ),
+    # ── 5-year dividend CAGR ────────────────────────────────────────────
+    _d(
+        "dividend_cagr_5y",
+        "POWER(adj_dividend / NULLIF(LAG(adj_dividend, 5) OVER w, 0), 0.2) - 1",
+        ("adj_dividend",),
+        category="dividend",
+        lag=True,
+    ),
 ]

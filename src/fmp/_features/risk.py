@@ -52,8 +52,6 @@ FEATURES = [
         category="risk",
         lag=True,
     ),
-    # ── VaR: skipped — PERCENTILE_CONT OVER window not supported in
-    #    DuckDB with ROWS frame.
     # ── 52-week range (from quote) ────────────────────────────────────
     _d(
         "distance_from_52w_high",
@@ -131,6 +129,48 @@ FEATURES = [
         " ELSE NULL END)"
         " OVER (PARTITION BY symbol ORDER BY date"
         " ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) * SQRT(252)",
+        ("close",),
+        category="risk",
+        lag=True,
+    ),
+    # ── Calmar ratio (1-year return / max drawdown) ─────────────────────
+    _d(
+        "calmar_ratio",
+        "((close / NULLIF(LAG(close, 252) OVER w, 0)) - 1)"
+        " / NULLIF(ABS((close - MAX(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 251 PRECEDING AND CURRENT ROW))"
+        " / NULLIF(MAX(close) OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 251 PRECEDING AND CURRENT ROW), 0)), 0)",
+        ("close",),
+        category="risk",
+        lag=True,
+    ),
+    # ── Value at Risk (5th percentile, 252-day) ─────────────────────────
+    _d(
+        "var_95_252d",
+        "QUANTILE_CONT((close / NULLIF(LAG(close) OVER w, 0) - 1), 0.05)"
+        " OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 251 PRECEDING AND CURRENT ROW)",
+        ("close",),
+        category="risk",
+        lag=True,
+    ),
+    # ── Return distribution: skewness (252-day) ─────────────────────────
+    _d(
+        "skewness_252d",
+        "SKEWNESS(close / NULLIF(LAG(close) OVER w, 0) - 1)"
+        " OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 251 PRECEDING AND CURRENT ROW)",
+        ("close",),
+        category="risk",
+        lag=True,
+    ),
+    # ── Return distribution: kurtosis (252-day) ─────────────────────────
+    _d(
+        "kurtosis_252d",
+        "KURTOSIS(close / NULLIF(LAG(close) OVER w, 0) - 1)"
+        " OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 251 PRECEDING AND CURRENT ROW)",
         ("close",),
         category="risk",
         lag=True,

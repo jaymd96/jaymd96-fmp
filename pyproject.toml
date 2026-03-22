@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "jaymd96-fmp"
-version = "0.3.1"
+version = "0.3.2"
 description = "Python client for the Financial Modeling Prep API with DuckDB caching"
 readme = "README.md"
 license = "MIT"

@@ -150,4 +150,39 @@ FEATURES = [
         category="growth",
         lag=True,
     ),
+    # ── 10-year CAGR features ───────────────────────────────────────────
+    _d(
+        "revenue_cagr_10y",
+        "POWER(revenue / NULLIF(LAG(revenue, 10) OVER w, 0), 1.0 / 10) - 1",
+        ("revenue",),
+        category="growth",
+        lag=True,
+    ),
+    _d(
+        "eps_cagr_10y",
+        "POWER(ABS(eps_diluted)"
+        " / NULLIF(ABS(LAG(eps_diluted, 10) OVER w), 0), 1.0 / 10) - 1",
+        ("eps_diluted",),
+        category="growth",
+        lag=True,
+    ),
+    _d(
+        "dividend_growth_5y",
+        "POWER(adj_dividend"
+        " / NULLIF(LAG(adj_dividend, 5) OVER w, 0), 1.0 / 5) - 1",
+        ("adj_dividend",),
+        category="growth",
+        lag=True,
+    ),
+    # ── Revenue growth consistency (5-period rolling stddev of YoY %) ───
+    _d(
+        "revenue_growth_consistency",
+        "STDDEV(((revenue - LAG(revenue) OVER w)"
+        " / NULLIF(ABS(LAG(revenue) OVER w), 0)))"
+        " OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 4 PRECEDING AND CURRENT ROW)",
+        ("revenue",),
+        category="growth",
+        lag=True,
+    ),
 ]

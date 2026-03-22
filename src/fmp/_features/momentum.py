@@ -114,4 +114,15 @@ FEATURES = [
         category="momentum",
         lag=True,
     ),
+    # ── Frog-in-the-pan (fraction of positive-return days, 252-day) ─────
+    _d(
+        "frog_in_pan",
+        "SUM(CASE WHEN (close - LAG(close) OVER w) > 0 THEN 1.0 ELSE 0.0 END)"
+        " OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 251 PRECEDING AND CURRENT ROW)"
+        " / NULLIF(252.0, 0)",
+        ("close",),
+        category="momentum",
+        lag=True,
+    ),
 ]
