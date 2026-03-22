@@ -55,6 +55,7 @@ class QueryBuilder:
         self._target_grain: Grain | None = None
         self._agg_overrides: dict[str, str] = {}
         self._force: bool = False
+        self._auto_fetch: bool = True
 
     # ------------------------------------------------------------------
     # Builder methods
@@ -93,6 +94,15 @@ class QueryBuilder:
     def force_refresh(self) -> QueryBuilder:
         """Bypass cache and re-fetch all data from the API."""
         self._force = True
+        return self
+
+    def auto_fetch(self, enabled: bool = True) -> QueryBuilder:
+        """Control whether missing data is auto-fetched from the API.
+
+        When ``False``, queries only read from the local DuckDB store.
+        Use :meth:`FMPClient.sync` to populate the store first.
+        """
+        self._auto_fetch = enabled
         return self
 
     # ------------------------------------------------------------------
@@ -257,54 +267,91 @@ class QueryBuilder:
     # ------------------------------------------------------------------
 
     def _fetch_datasets(self, grouped: dict[str, list]) -> None:
-        """Fetch each required dataset, writing to the bitemporal store."""
-        tasks: list[tuple[str, str | None]] = []  # (dataset_name, symbol_or_None)
+        """Fetch each required dataset, writing to the bitemporal store.
+
+        Uses store-first logic: checks if data exists (not TTL-based).
+        When many symbols need the same dataset, uses bulk endpoints.
+        Respects ``self._auto_fetch`` — skips API calls when False.
+        """
+        from fmp._sync import BULK_MAP
+
+        if not self._auto_fetch:
+            return
+
+        # Group tasks by dataset to detect bulk opportunities
+        datasets_needing_fetch: dict[str, list[str | None]] = {}
 
         for ds_name in grouped:
             ds = DATASETS[ds_name]
-            ttl = self._ttls.get(ds.ttl_category, self._ttls.get("default", 3600))
 
             if "symbol" not in ds.keys:
-                # Date-only dataset (e.g., treasury_rates) — fetch once
-                if not self._force and self._store.is_fresh(ds_name, None, ttl):
+                if not self._force and self._store.has_data(ds_name, None, self._start, self._end):
                     continue
-                tasks.append((ds_name, None))
+                datasets_needing_fetch.setdefault(ds_name, []).append(None)
             else:
                 for sym in self._symbols:
-                    if not self._force and self._store.is_fresh(ds_name, sym, ttl):
+                    if not self._force and self._store.has_data(ds_name, sym, self._start, self._end):
                         continue
-                    tasks.append((ds_name, sym))
+                    datasets_needing_fetch.setdefault(ds_name, []).append(sym)
 
-        if not tasks:
+        if not datasets_needing_fetch:
             return
 
-        def _fetch_one(ds_name: str, symbol: str | None) -> None:
+        for ds_name, symbols_to_fetch in datasets_needing_fetch.items():
             ds = DATASETS[ds_name]
-            params: dict[str, str] = {}
-            if symbol:
-                params["symbol"] = symbol
-            if "date" in ds.keys and self._start:
-                params["from"] = self._start
-            if "date" in ds.keys and self._end:
-                params["to"] = self._end
-            rows = self._http.get(ds.endpoint, params=params)
-            if rows:
-                if symbol:
-                    for row in rows:
-                        row.setdefault("symbol", symbol)
-                self._store.write(ds_name, rows)
 
-        with ThreadPoolExecutor(max_workers=min(10, len(tasks))) as pool:
-            futures = {
-                pool.submit(_fetch_one, ds_name, sym): (ds_name, sym)
-                for ds_name, sym in tasks
-            }
-            for future in as_completed(futures):
-                exc = future.exception()
-                if exc:
-                    ds_name, sym = futures[future]
-                    # Log but don't fail the whole query for partial errors
-                    pass
+            # Use bulk endpoint if available and fetching many symbols
+            if (ds_name in BULK_MAP
+                and len(symbols_to_fetch) >= 5
+                and symbols_to_fetch[0] is not None):
+                self._fetch_bulk(ds_name, BULK_MAP[ds_name])
+                continue
+
+            # Otherwise fetch per-symbol concurrently
+            tasks = [(ds_name, sym) for sym in symbols_to_fetch]
+
+            def _fetch_one(task_ds: str, symbol: str | None) -> None:
+                task_ds_def = DATASETS[task_ds]
+                params: dict[str, str] = {}
+                if symbol:
+                    params["symbol"] = symbol
+                if "date" in task_ds_def.keys and self._start:
+                    params["from"] = self._start
+                if "date" in task_ds_def.keys and self._end:
+                    params["to"] = self._end
+                rows = self._http.get(task_ds_def.endpoint, params=params)
+                if rows:
+                    if symbol:
+                        for row in rows:
+                            row.setdefault("symbol", symbol)
+                    self._store.write(task_ds, rows)
+
+            with ThreadPoolExecutor(max_workers=min(10, len(tasks))) as pool:
+                futures = {
+                    pool.submit(_fetch_one, dn, sym): (dn, sym)
+                    for dn, sym in tasks
+                }
+                for future in as_completed(futures):
+                    future.exception()  # consume to avoid unhandled
+
+    def _fetch_bulk(self, ds_name: str, bulk_info: tuple) -> None:
+        """Fetch an entire dataset via bulk endpoint."""
+        endpoint, needs_year, needs_period = bulk_info
+        start_year = int(self._start[:4]) if self._start else 2020
+        end_year = int(self._end[:4]) if self._end else 2025
+
+        for year in range(start_year, end_year + 1):
+            if not self._force and self._store.has_bulk_data(ds_name, year):
+                continue
+            params: dict = {"year": year}
+            if needs_period:
+                params["period"] = "annual"
+            try:
+                rows = self._http.get(endpoint, params=params)
+                if rows:
+                    self._store.write(ds_name, rows)
+            except Exception:
+                pass
 
     # ------------------------------------------------------------------
     # Internal: SQL generation

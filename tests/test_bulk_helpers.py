@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import re
 import pytest
 from fmp import FMPClient, FMPError
 
 
 def test_fetch_many(httpx_mock):
-    httpx_mock.add_response(json=[{"symbol": "AAPL", "price": 180}])
-    httpx_mock.add_response(json=[{"symbol": "MSFT", "price": 400}])
+    httpx_mock.add_response(
+        url=re.compile(r".*symbol=AAPL.*"),
+        json=[{"symbol": "AAPL", "price": 180}],
+    )
+    httpx_mock.add_response(
+        url=re.compile(r".*symbol=MSFT.*"),
+        json=[{"symbol": "MSFT", "price": 400}],
+    )
 
     c = FMPClient(api_key="test", cache_path=None)
     results = c.fetch_many(c.quote, ["AAPL", "MSFT"], max_workers=2)
@@ -19,8 +26,14 @@ def test_fetch_many(httpx_mock):
 
 def test_fetch_many_partial_failure(httpx_mock):
     """If some symbols fail but others succeed, results are returned."""
-    httpx_mock.add_response(json=[{"symbol": "AAPL"}])
-    httpx_mock.add_response(status_code=404, text="Not found")
+    httpx_mock.add_response(
+        url=re.compile(r".*symbol=AAPL.*"),
+        json=[{"symbol": "AAPL"}],
+    )
+    httpx_mock.add_response(
+        url=re.compile(r".*symbol=INVALID.*"),
+        status_code=404, text="Not found",
+    )
 
     c = FMPClient(api_key="test", cache_path=None)
     results = c.fetch_many(c.quote, ["AAPL", "INVALID"], max_workers=2)

@@ -207,6 +207,56 @@ class BitemporalStore:
         return row is not None
 
     # ------------------------------------------------------------------
+    # Data existence checks (for sync — no TTL, just "is data there?")
+    # ------------------------------------------------------------------
+
+    def has_data(
+        self, dataset: str, symbol: str | None,
+        start: str | None = None, end: str | None = None,
+    ) -> bool:
+        """Check if any data exists for this dataset/symbol (ignoring TTL)."""
+        ds = DATASETS[dataset]
+        where_parts: list[str] = []
+        params: list = []
+
+        if "symbol" in ds.keys and symbol:
+            where_parts.append("symbol = ?")
+            params.append(symbol)
+        if "date" in ds.keys and start:
+            where_parts.append("date >= ?")
+            params.append(start)
+        if "date" in ds.keys and end:
+            where_parts.append("date <= ?")
+            params.append(end)
+
+        where = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
+        row = self._conn.execute(
+            f"SELECT 1 FROM {dataset} {where} LIMIT 1", params
+        ).fetchone()
+        return row is not None
+
+    def has_bulk_data(self, dataset: str, year: int) -> bool:
+        """Check if bulk data for a given year has been loaded."""
+        ds = DATASETS[dataset]
+        if "date" not in ds.keys:
+            return self.row_count(dataset) > 0
+        row = self._conn.execute(
+            f"SELECT 1 FROM {dataset} WHERE EXTRACT(YEAR FROM date) = ? LIMIT 1",
+            [year],
+        ).fetchone()
+        return row is not None
+
+    def symbols_with_data(self, dataset: str) -> list[str]:
+        """List all symbols that have data in this dataset."""
+        ds = DATASETS[dataset]
+        if "symbol" not in ds.keys:
+            return []
+        rows = self._conn.execute(
+            f"SELECT DISTINCT symbol FROM {dataset} ORDER BY symbol"
+        ).fetchall()
+        return [r[0] for r in rows]
+
+    # ------------------------------------------------------------------
     # Revisions
     # ------------------------------------------------------------------
 

@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 from fmp._cache import DuckDBCache
 from fmp._config import DEFAULT_TTLS
+from fmp._sync import SyncManager
 from fmp._exceptions import FMPError
 from fmp._http import HTTPClient
 from fmp._store import BitemporalStore
@@ -110,6 +111,7 @@ class FMPClient(
         )
         self._cache = DuckDBCache(cache_path)
         self._store = BitemporalStore(self._cache.connection)
+        self._sync = SyncManager(self._http, self._store)
         self._ttls: dict[str, int] = {**DEFAULT_TTLS, **(ttl_overrides or {})}
 
     # ------------------------------------------------------------------
@@ -145,6 +147,61 @@ class FMPClient(
         data = self._http.get(path, params=params)
         self._cache.set(cache_key, path, params, data, ttl)
         return data
+
+    # ------------------------------------------------------------------
+    # Data sync (bulk load from API into DuckDB store)
+    # ------------------------------------------------------------------
+
+    def sync(
+        self,
+        *,
+        symbols: list[str] | None = None,
+        datasets: list[str] | None = None,
+        start: str | None = None,
+        end: str | None = None,
+        period: str = "annual",
+        use_bulk: bool = True,
+        max_workers: int = 10,
+        on_progress: Callable[[str, str], None] | None = None,
+    ) -> dict[str, int]:
+        """Sync data from FMP API into the local DuckDB store.
+
+        After syncing, use :meth:`query` with ``.auto_fetch(False)``
+        to query without hitting the API.
+
+        Example::
+
+            client.sync(
+                symbols=["AAPL", "MSFT"],
+                datasets=["daily_price", "income_statement"],
+                start="2020-01-01", end="2024-12-31",
+            )
+        """
+        return self._sync.sync(
+            symbols=symbols, datasets=datasets,
+            start=start, end=end, period=period,
+            use_bulk=use_bulk, max_workers=max_workers,
+            on_progress=on_progress,
+        )
+
+    def sync_all(
+        self,
+        *,
+        years: list[int] | None = None,
+        period: str = "annual",
+        on_progress: Callable[[str, str], None] | None = None,
+    ) -> dict[str, int]:
+        """Bulk-load ALL financial statement data via bulk endpoints.
+
+        One API call per dataset per year — loads the entire market.
+
+        Example::
+
+            client.sync_all(years=[2020, 2021, 2022, 2023, 2024])
+        """
+        return self._sync.sync_all(
+            years=years, period=period, on_progress=on_progress,
+        )
 
     # ------------------------------------------------------------------
     # Bulk / concurrency helpers
