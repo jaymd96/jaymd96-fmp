@@ -273,7 +273,7 @@ class QueryBuilder:
         When many symbols need the same dataset, uses bulk endpoints.
         Respects ``self._auto_fetch`` — skips API calls when False.
         """
-        from fmp._sync import BULK_MAP
+        from fmp._sync import BULK_YEARLY as BULK_MAP
 
         if not self._auto_fetch:
             return

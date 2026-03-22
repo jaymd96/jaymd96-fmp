@@ -203,6 +203,53 @@ class FMPClient(
             years=years, period=period, on_progress=on_progress,
         )
 
+    def sync_universe(
+        self,
+        universe: str = "sp500",
+        *,
+        datasets: list[str] | None = None,
+        start: str | None = None,
+        end: str | None = None,
+        period: str = "annual",
+        max_workers: int = 10,
+        on_progress: Callable[[str, str], None] | None = None,
+    ) -> dict[str, int]:
+        """Sync all data for a stock universe.
+
+        Fetches the constituent list automatically, then syncs all datasets.
+
+        Args:
+            universe: ``"sp500"``, ``"nasdaq"``, or ``"dowjones"``.
+
+        Example::
+
+            client.sync_universe("sp500", start="2020-01-01", end="2024-12-31")
+        """
+        return self._sync.sync_universe(
+            universe, datasets=datasets,
+            start=start, end=end, period=period,
+            max_workers=max_workers, on_progress=on_progress,
+        )
+
+    def estimate_sync_calls(
+        self,
+        *,
+        symbols: list[str] | None = None,
+        datasets: list[str] | None = None,
+        start: str | None = None,
+        end: str | None = None,
+    ) -> dict[str, int]:
+        """Estimate API calls needed for a sync without making any.
+
+        Example::
+
+            est = client.estimate_sync_calls(start="1995-01-01", end="2025-12-31")
+            print(f"Total calls: {est['_total']}")
+        """
+        return self._sync.estimate_calls(
+            symbols=symbols, datasets=datasets, start=start, end=end,
+        )
+
     # ------------------------------------------------------------------
     # Bulk / concurrency helpers
     # ------------------------------------------------------------------

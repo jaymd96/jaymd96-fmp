@@ -169,6 +169,14 @@ def test_sync_all(httpx_mock):
             url=re.compile(rf".*/ratios-bulk.*year={year}"),
             json=[],
         )
+        httpx_mock.add_response(
+            url=re.compile(rf".*/financial-scores-bulk.*year={year}"),
+            json=[],
+        )
+    # Paginated profile bulk, batch quotes, treasury rates
+    httpx_mock.add_response(url=re.compile(r".*/profile-bulk.*"), json=[])
+    httpx_mock.add_response(url=re.compile(r".*/batch-request-end-of-day-prices.*"), json=[])
+    httpx_mock.add_response(url=re.compile(r".*/treasury-rates.*"), json=[])
 
     c = FMPClient(api_key="test", cache_path=None)
     result = c.sync_all(years=[2022, 2023])
