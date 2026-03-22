@@ -494,6 +494,82 @@ _SHARES_FLOAT = DatasetDef(
     },
 )
 
+_DCF_DATA = DatasetDef(
+    name="dcf_data",
+    endpoint="discounted-cash-flow",
+    grain=Grain.SNAPSHOT,
+    keys=("symbol",),
+    ttl_category="dcf",
+    fields={
+        "dcf_val":        _f("dcf_val",        "dcf"),
+        "dcf_stock_price": _f("dcf_stock_price", "stockPrice"),
+    },
+)
+
+_ESG_DATA = DatasetDef(
+    name="esg_data",
+    endpoint="esg-environmental-social-governance-data",
+    grain=Grain.SNAPSHOT,
+    keys=("symbol",),
+    ttl_category="esg",
+    fields={
+        "esg_total":         _f("esg_total",         "environmentalScore"),  # composite
+        "esg_environmental": _f("esg_environmental", "environmentalScore"),
+        "esg_social":        _f("esg_social",        "socialScore"),
+        "esg_governance":    _f("esg_governance",    "governanceScore"),
+        "esg_score":         _f("esg_score",         "ESGScore"),
+    },
+)
+
+_PRICE_CHANGE = DatasetDef(
+    name="price_change",
+    endpoint="stock-price-change",
+    grain=Grain.SNAPSHOT,
+    keys=("symbol",),
+    ttl_category="realtime_quotes",
+    fields={
+        "fmp_return_1d":  _f("fmp_return_1d",  "1D"),
+        "fmp_return_5d":  _f("fmp_return_5d",  "5D"),
+        "fmp_return_1m":  _f("fmp_return_1m",  "1M"),
+        "fmp_return_3m":  _f("fmp_return_3m",  "3M"),
+        "fmp_return_6m":  _f("fmp_return_6m",  "6M"),
+        "fmp_return_ytd": _f("fmp_return_ytd", "ytd"),
+        "fmp_return_1y":  _f("fmp_return_1y",  "1Y"),
+        "fmp_return_3y":  _f("fmp_return_3y",  "3Y"),
+        "fmp_return_5y":  _f("fmp_return_5y",  "5Y"),
+    },
+)
+
+_SPLITS_DATA = DatasetDef(
+    name="splits_data",
+    endpoint="splits",
+    grain=Grain.QUARTERLY,
+    keys=("symbol", "date"),
+    ttl_category="earnings_calendar",
+    fields={
+        "split_label":       _f("split_label",       "label",       "VARCHAR"),
+        "split_numerator":   _f("split_numerator",   "numerator",   "INTEGER"),
+        "split_denominator": _f("split_denominator", "denominator", "INTEGER"),
+    },
+)
+
+_INSTITUTIONAL_SUMMARY = DatasetDef(
+    name="institutional_summary",
+    endpoint="institutional-ownership/symbol-positions-summary",
+    grain=Grain.SNAPSHOT,
+    keys=("symbol",),
+    ttl_category="sec_filings",
+    fields={
+        "inst_holders_count":    _f("inst_holders_count",    "investorsHolding",        "INTEGER"),
+        "inst_holders_prev":     _f("inst_holders_prev",     "lastInvestorsHolding",    "INTEGER"),
+        "inst_holders_change":   _f("inst_holders_change",   "investorsHoldingChange",  "INTEGER"),
+        "inst_total_invested":   _f("inst_total_invested",   "totalInvested",           "BIGINT"),
+        "inst_invested_prev":    _f("inst_invested_prev",    "lastTotalInvested",       "BIGINT"),
+        "inst_invested_change":  _f("inst_invested_change",  "totalInvestedChange",     "BIGINT"),
+        "inst_put_call_ratio":   _f("inst_put_call_ratio",   "putCallRatio"),
+    },
+)
+
 _FINANCIAL_SCORES = DatasetDef(
     name="financial_scores",
     endpoint="financial-scores",
@@ -529,6 +605,11 @@ DATASETS: dict[str, DatasetDef] = {
         _EARNINGS,
         _DIVIDENDS,
         _ENTERPRISE_VALUES,
+        _DCF_DATA,
+        _ESG_DATA,
+        _PRICE_CHANGE,
+        _SPLITS_DATA,
+        _INSTITUTIONAL_SUMMARY,
         _FINANCIAL_SCORES,
         _TREASURY_RATES,
         _ANALYST_ESTIMATES,

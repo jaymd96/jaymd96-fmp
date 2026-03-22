@@ -292,6 +292,502 @@ def _alpha_jensen(df, ctx):
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Index membership
+# ──────────────────────────────────────────────────────────────────────
+
+def _in_index(index_endpoint):
+    """Factory for index membership check."""
+    def compute(df, ctx):
+        import polars as pl
+        http = ctx.get("http")
+        if not http:
+            return pl.Series([None] * len(df), dtype=pl.Int32)
+        try:
+            constituents = http.get(index_endpoint)
+            member_symbols = {c.get("symbol", "") for c in constituents}
+            return df["symbol"].is_in(member_symbols).cast(pl.Int32)
+        except Exception:
+            return pl.Series([None] * len(df), dtype=pl.Int32)
+    return compute
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Insider trade aggregations
+# ──────────────────────────────────────────────────────────────────────
+
+def _fetch_insider_trades(http, symbols):
+    """Fetch insider trades for symbols."""
+    import polars as pl
+
+    all_trades = []
+    for sym in symbols:
+        try:
+            trades = http.get("insider-trading/search", params={"symbol": sym, "limit": 100})
+            for t in trades:
+                t.setdefault("symbol", sym)
+            all_trades.extend(trades)
+        except Exception:
+            pass
+    if not all_trades:
+        return pl.DataFrame()
+    return pl.DataFrame(all_trades, strict=False)
+
+
+def _get_insider_trades(ctx, http, symbols):
+    """Fetch once, cache in ctx."""
+    if "_insider_trades" not in ctx:
+        ctx["_insider_trades"] = _fetch_insider_trades(http, symbols)
+    return ctx["_insider_trades"]
+
+
+def _insider_net_buying_90d(df, ctx):
+    import polars as pl
+    from datetime import datetime, timedelta
+
+    http = ctx.get("http")
+    if not http:
+        return pl.Series([None] * len(df), dtype=pl.Float64)
+
+    symbols = df["symbol"].unique().to_list()
+    trades_df = _get_insider_trades(ctx, http, symbols)
+    if trades_df.is_empty():
+        return pl.Series([0.0] * len(df), dtype=pl.Float64)
+
+    cutoff = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+    trades_df = trades_df.filter(pl.col("transactionDate") >= cutoff)
+
+    buys = trades_df.filter(pl.col("acquistionOrDisposition") == "A")
+    sells = trades_df.filter(pl.col("acquistionOrDisposition") == "D")
+
+    buy_val = buys.group_by("symbol").agg(
+        (pl.col("securitiesTransacted").cast(pl.Float64) * pl.col("price").cast(pl.Float64)).sum().alias("buy_value")
+    )
+    sell_val = sells.group_by("symbol").agg(
+        (pl.col("securitiesTransacted").cast(pl.Float64) * pl.col("price").cast(pl.Float64)).sum().alias("sell_value")
+    )
+
+    result = df.select("symbol").join(buy_val, on="symbol", how="left").join(sell_val, on="symbol", how="left")
+    return result["buy_value"].fill_null(0) - result["sell_value"].fill_null(0)
+
+
+def _insider_buy_count_30d(df, ctx):
+    import polars as pl
+    from datetime import datetime, timedelta
+
+    http = ctx.get("http")
+    if not http:
+        return pl.Series([None] * len(df), dtype=pl.Int64)
+
+    symbols = df["symbol"].unique().to_list()
+    trades_df = _get_insider_trades(ctx, http, symbols)
+    if trades_df.is_empty():
+        return pl.Series([0] * len(df), dtype=pl.Int64)
+
+    cutoff = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+    buys = trades_df.filter(
+        (pl.col("transactionDate") >= cutoff) & (pl.col("acquistionOrDisposition") == "A")
+    )
+    counts = buys.group_by("symbol").agg(pl.len().alias("buy_count"))
+    result = df.select("symbol").join(counts, on="symbol", how="left")
+    return result["buy_count"].fill_null(0)
+
+
+def _insider_sell_count_30d(df, ctx):
+    import polars as pl
+    from datetime import datetime, timedelta
+
+    http = ctx.get("http")
+    if not http:
+        return pl.Series([None] * len(df), dtype=pl.Int64)
+
+    symbols = df["symbol"].unique().to_list()
+    trades_df = _get_insider_trades(ctx, http, symbols)
+    if trades_df.is_empty():
+        return pl.Series([0] * len(df), dtype=pl.Int64)
+
+    cutoff = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+    sells = trades_df.filter(
+        (pl.col("transactionDate") >= cutoff) & (pl.col("acquistionOrDisposition") == "D")
+    )
+    counts = sells.group_by("symbol").agg(pl.len().alias("sell_count"))
+    result = df.select("symbol").join(counts, on="symbol", how="left")
+    return result["sell_count"].fill_null(0)
+
+
+def _insider_buy_sell_ratio_90d(df, ctx):
+    import polars as pl
+    from datetime import datetime, timedelta
+
+    http = ctx.get("http")
+    if not http:
+        return pl.Series([None] * len(df), dtype=pl.Float64)
+
+    symbols = df["symbol"].unique().to_list()
+    trades_df = _get_insider_trades(ctx, http, symbols)
+    if trades_df.is_empty():
+        return pl.Series([None] * len(df), dtype=pl.Float64)
+
+    cutoff = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+    recent = trades_df.filter(pl.col("transactionDate") >= cutoff)
+
+    buy_counts = recent.filter(pl.col("acquistionOrDisposition") == "A").group_by("symbol").agg(
+        pl.len().alias("buy_count")
+    )
+    sell_counts = recent.filter(pl.col("acquistionOrDisposition") == "D").group_by("symbol").agg(
+        pl.len().alias("sell_count")
+    )
+    result = (
+        df.select("symbol")
+        .join(buy_counts, on="symbol", how="left")
+        .join(sell_counts, on="symbol", how="left")
+    )
+    buy_c = result["buy_count"].fill_null(0).cast(pl.Float64)
+    sell_c = result["sell_count"].fill_null(0).cast(pl.Float64)
+    return pl.when(sell_c > 0).then(buy_c / sell_c).otherwise(None)
+
+
+def _insider_buying_cluster(df, ctx):
+    """3+ unique insiders buying in 30 days."""
+    import polars as pl
+    from datetime import datetime, timedelta
+
+    http = ctx.get("http")
+    if not http:
+        return pl.Series([None] * len(df), dtype=pl.Int32)
+
+    symbols = df["symbol"].unique().to_list()
+    trades_df = _get_insider_trades(ctx, http, symbols)
+    if trades_df.is_empty():
+        return pl.Series([0] * len(df), dtype=pl.Int32)
+
+    cutoff = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+    buys = trades_df.filter(
+        (pl.col("transactionDate") >= cutoff) & (pl.col("acquistionOrDisposition") == "A")
+    )
+    if buys.is_empty():
+        return pl.Series([0] * len(df), dtype=pl.Int32)
+
+    # Count unique insiders per symbol
+    unique_buyers = buys.group_by("symbol").agg(
+        pl.col("reportingName").n_unique().alias("unique_buyers")
+    )
+    result = df.select("symbol").join(unique_buyers, on="symbol", how="left")
+    return (result["unique_buyers"].fill_null(0) >= 3).cast(pl.Int32)
+
+
+def _insider_total_bought_90d(df, ctx):
+    """Total $ value of insider buys in 90 days."""
+    import polars as pl
+    from datetime import datetime, timedelta
+
+    http = ctx.get("http")
+    if not http:
+        return pl.Series([None] * len(df), dtype=pl.Float64)
+
+    symbols = df["symbol"].unique().to_list()
+    trades_df = _get_insider_trades(ctx, http, symbols)
+    if trades_df.is_empty():
+        return pl.Series([0.0] * len(df), dtype=pl.Float64)
+
+    cutoff = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+    buys = trades_df.filter(
+        (pl.col("transactionDate") >= cutoff) & (pl.col("acquistionOrDisposition") == "A")
+    )
+    buy_val = buys.group_by("symbol").agg(
+        (pl.col("securitiesTransacted").cast(pl.Float64) * pl.col("price").cast(pl.Float64)).sum().alias("total_bought")
+    )
+    result = df.select("symbol").join(buy_val, on="symbol", how="left")
+    return result["total_bought"].fill_null(0)
+
+
+def _insider_total_sold_90d(df, ctx):
+    """Total $ value of insider sells in 90 days."""
+    import polars as pl
+    from datetime import datetime, timedelta
+
+    http = ctx.get("http")
+    if not http:
+        return pl.Series([None] * len(df), dtype=pl.Float64)
+
+    symbols = df["symbol"].unique().to_list()
+    trades_df = _get_insider_trades(ctx, http, symbols)
+    if trades_df.is_empty():
+        return pl.Series([0.0] * len(df), dtype=pl.Float64)
+
+    cutoff = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+    sells = trades_df.filter(
+        (pl.col("transactionDate") >= cutoff) & (pl.col("acquistionOrDisposition") == "D")
+    )
+    sell_val = sells.group_by("symbol").agg(
+        (pl.col("securitiesTransacted").cast(pl.Float64) * pl.col("price").cast(pl.Float64)).sum().alias("total_sold")
+    )
+    result = df.select("symbol").join(sell_val, on="symbol", how="left")
+    return result["total_sold"].fill_null(0)
+
+
+def _insider_officer_buying(df, ctx):
+    """Any officer/director buying in 90 days (boolean as Int32)."""
+    import polars as pl
+    from datetime import datetime, timedelta
+
+    http = ctx.get("http")
+    if not http:
+        return pl.Series([None] * len(df), dtype=pl.Int32)
+
+    symbols = df["symbol"].unique().to_list()
+    trades_df = _get_insider_trades(ctx, http, symbols)
+    if trades_df.is_empty():
+        return pl.Series([0] * len(df), dtype=pl.Int32)
+
+    cutoff = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+    officer_buys = trades_df.filter(
+        (pl.col("transactionDate") >= cutoff)
+        & (pl.col("acquistionOrDisposition") == "A")
+        & (pl.col("typeOfOwner").str.to_lowercase().str.contains("officer|director"))
+    )
+    officers = officer_buys.group_by("symbol").agg(pl.len().alias("officer_buys"))
+    result = df.select("symbol").join(officers, on="symbol", how="left")
+    return (result["officer_buys"].fill_null(0) > 0).cast(pl.Int32)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Senate trade aggregations
+# ──────────────────────────────────────────────────────────────────────
+
+def _fetch_senate_trades(http, symbols):
+    """Fetch senate trades for symbols."""
+    import polars as pl
+
+    all_trades = []
+    for sym in symbols:
+        try:
+            trades = http.get("senate-trading", params={"symbol": sym})
+            for t in trades:
+                t.setdefault("symbol", sym)
+            all_trades.extend(trades)
+        except Exception:
+            pass
+    if not all_trades:
+        return pl.DataFrame()
+    return pl.DataFrame(all_trades, strict=False)
+
+
+def _get_senate_trades(ctx, http, symbols):
+    """Fetch once, cache in ctx."""
+    if "_senate_trades" not in ctx:
+        ctx["_senate_trades"] = _fetch_senate_trades(http, symbols)
+    return ctx["_senate_trades"]
+
+
+def _senate_buy_count_90d(df, ctx):
+    import polars as pl
+    from datetime import datetime, timedelta
+
+    http = ctx.get("http")
+    if not http:
+        return pl.Series([None] * len(df), dtype=pl.Int64)
+
+    symbols = df["symbol"].unique().to_list()
+    trades_df = _get_senate_trades(ctx, http, symbols)
+    if trades_df.is_empty():
+        return pl.Series([0] * len(df), dtype=pl.Int64)
+
+    cutoff = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+    buys = trades_df.filter(
+        (pl.col("transactionDate") >= cutoff)
+        & (pl.col("type").str.to_lowercase().str.contains("purchase"))
+    )
+    counts = buys.group_by("symbol").agg(pl.len().alias("buy_count"))
+    result = df.select("symbol").join(counts, on="symbol", how="left")
+    return result["buy_count"].fill_null(0)
+
+
+def _senate_sell_count_90d(df, ctx):
+    import polars as pl
+    from datetime import datetime, timedelta
+
+    http = ctx.get("http")
+    if not http:
+        return pl.Series([None] * len(df), dtype=pl.Int64)
+
+    symbols = df["symbol"].unique().to_list()
+    trades_df = _get_senate_trades(ctx, http, symbols)
+    if trades_df.is_empty():
+        return pl.Series([0] * len(df), dtype=pl.Int64)
+
+    cutoff = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+    sells = trades_df.filter(
+        (pl.col("transactionDate") >= cutoff)
+        & (pl.col("type").str.to_lowercase().str.contains("sale"))
+    )
+    counts = sells.group_by("symbol").agg(pl.len().alias("sell_count"))
+    result = df.select("symbol").join(counts, on="symbol", how="left")
+    return result["sell_count"].fill_null(0)
+
+
+def _senate_net_flow_90d(df, ctx):
+    import polars as pl
+    from datetime import datetime, timedelta
+
+    http = ctx.get("http")
+    if not http:
+        return pl.Series([None] * len(df), dtype=pl.Int64)
+
+    symbols = df["symbol"].unique().to_list()
+    trades_df = _get_senate_trades(ctx, http, symbols)
+    if trades_df.is_empty():
+        return pl.Series([0] * len(df), dtype=pl.Int64)
+
+    cutoff = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+    recent = trades_df.filter(pl.col("transactionDate") >= cutoff)
+
+    buy_counts = recent.filter(
+        pl.col("type").str.to_lowercase().str.contains("purchase")
+    ).group_by("symbol").agg(pl.len().alias("buy_count"))
+
+    sell_counts = recent.filter(
+        pl.col("type").str.to_lowercase().str.contains("sale")
+    ).group_by("symbol").agg(pl.len().alias("sell_count"))
+
+    result = (
+        df.select("symbol")
+        .join(buy_counts, on="symbol", how="left")
+        .join(sell_counts, on="symbol", how="left")
+    )
+    return result["buy_count"].fill_null(0) - result["sell_count"].fill_null(0)
+
+
+def _senate_activity_flag(df, ctx):
+    """Any senate trade in 30 days (boolean as Int32)."""
+    import polars as pl
+    from datetime import datetime, timedelta
+
+    http = ctx.get("http")
+    if not http:
+        return pl.Series([None] * len(df), dtype=pl.Int32)
+
+    symbols = df["symbol"].unique().to_list()
+    trades_df = _get_senate_trades(ctx, http, symbols)
+    if trades_df.is_empty():
+        return pl.Series([0] * len(df), dtype=pl.Int32)
+
+    cutoff = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+    recent = trades_df.filter(pl.col("transactionDate") >= cutoff)
+    active = recent.group_by("symbol").agg(pl.len().alias("trade_count"))
+    result = df.select("symbol").join(active, on="symbol", how="left")
+    return (result["trade_count"].fill_null(0) > 0).cast(pl.Int32)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Analyst grade aggregations
+# ──────────────────────────────────────────────────────────────────────
+
+def _fetch_grades(http, symbols):
+    """Fetch analyst grades for symbols."""
+    import polars as pl
+
+    all_grades = []
+    for sym in symbols:
+        try:
+            grades = http.get("grades", params={"symbol": sym, "limit": 100})
+            for g in grades:
+                g.setdefault("symbol", sym)
+            all_grades.extend(grades)
+        except Exception:
+            pass
+    if not all_grades:
+        return pl.DataFrame()
+    return pl.DataFrame(all_grades, strict=False)
+
+
+def _get_grades(ctx, http, symbols):
+    """Fetch once, cache in ctx."""
+    if "_grades" not in ctx:
+        ctx["_grades"] = _fetch_grades(http, symbols)
+    return ctx["_grades"]
+
+
+def _upgrades_90d(df, ctx):
+    import polars as pl
+    from datetime import datetime, timedelta
+
+    http = ctx.get("http")
+    if not http:
+        return pl.Series([None] * len(df), dtype=pl.Int64)
+
+    symbols = df["symbol"].unique().to_list()
+    grades_df = _get_grades(ctx, http, symbols)
+    if grades_df.is_empty():
+        return pl.Series([0] * len(df), dtype=pl.Int64)
+
+    cutoff = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+    upgrades = grades_df.filter(
+        (pl.col("date") >= cutoff)
+        & (pl.col("action").str.to_lowercase() == "upgrade")
+    )
+    counts = upgrades.group_by("symbol").agg(pl.len().alias("upgrade_count"))
+    result = df.select("symbol").join(counts, on="symbol", how="left")
+    return result["upgrade_count"].fill_null(0)
+
+
+def _downgrades_90d(df, ctx):
+    import polars as pl
+    from datetime import datetime, timedelta
+
+    http = ctx.get("http")
+    if not http:
+        return pl.Series([None] * len(df), dtype=pl.Int64)
+
+    symbols = df["symbol"].unique().to_list()
+    grades_df = _get_grades(ctx, http, symbols)
+    if grades_df.is_empty():
+        return pl.Series([0] * len(df), dtype=pl.Int64)
+
+    cutoff = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+    downgrades = grades_df.filter(
+        (pl.col("date") >= cutoff)
+        & (pl.col("action").str.to_lowercase() == "downgrade")
+    )
+    counts = downgrades.group_by("symbol").agg(pl.len().alias("downgrade_count"))
+    result = df.select("symbol").join(counts, on="symbol", how="left")
+    return result["downgrade_count"].fill_null(0)
+
+
+def _upgrade_downgrade_ratio(df, ctx):
+    import polars as pl
+    from datetime import datetime, timedelta
+
+    http = ctx.get("http")
+    if not http:
+        return pl.Series([None] * len(df), dtype=pl.Float64)
+
+    symbols = df["symbol"].unique().to_list()
+    grades_df = _get_grades(ctx, http, symbols)
+    if grades_df.is_empty():
+        return pl.Series([None] * len(df), dtype=pl.Float64)
+
+    cutoff = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+    recent = grades_df.filter(pl.col("date") >= cutoff)
+
+    up_counts = recent.filter(
+        pl.col("action").str.to_lowercase() == "upgrade"
+    ).group_by("symbol").agg(pl.len().alias("up_count"))
+
+    down_counts = recent.filter(
+        pl.col("action").str.to_lowercase() == "downgrade"
+    ).group_by("symbol").agg(pl.len().alias("down_count"))
+
+    result = (
+        df.select("symbol")
+        .join(up_counts, on="symbol", how="left")
+        .join(down_counts, on="symbol", how="left")
+    )
+    up_c = result["up_count"].fill_null(0).cast(pl.Float64)
+    down_c = result["down_count"].fill_null(0).cast(pl.Float64)
+    return pl.when(down_c > 0).then(up_c / down_c).otherwise(None)
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Registry
 # ──────────────────────────────────────────────────────────────────────
 
@@ -325,6 +821,28 @@ POST_COMPUTE_FEATURES: list[PostComputeFieldDef] = [
         "alpha_jensen", _alpha_jensen, ("close",), category="risk",
         reference_symbols=("^GSPC",),
     ),
+    # Index membership
+    PostComputeFieldDef("in_sp500", _in_index("sp500-constituent"), ("close",), category="index_membership"),
+    PostComputeFieldDef("in_nasdaq", _in_index("nasdaq-constituent"), ("close",), category="index_membership"),
+    PostComputeFieldDef("in_dowjones", _in_index("dowjones-constituent"), ("close",), category="index_membership"),
+    # Insider trades
+    PostComputeFieldDef("insider_net_buying_90d", _insider_net_buying_90d, ("close",), category="insider"),
+    PostComputeFieldDef("insider_buy_count_30d", _insider_buy_count_30d, ("close",), category="insider"),
+    PostComputeFieldDef("insider_sell_count_30d", _insider_sell_count_30d, ("close",), category="insider"),
+    PostComputeFieldDef("insider_buy_sell_ratio_90d", _insider_buy_sell_ratio_90d, ("close",), category="insider"),
+    PostComputeFieldDef("insider_buying_cluster", _insider_buying_cluster, ("close",), category="insider"),
+    PostComputeFieldDef("insider_total_bought_90d", _insider_total_bought_90d, ("close",), category="insider"),
+    PostComputeFieldDef("insider_total_sold_90d", _insider_total_sold_90d, ("close",), category="insider"),
+    PostComputeFieldDef("insider_officer_buying", _insider_officer_buying, ("close",), category="insider"),
+    # Senate trades
+    PostComputeFieldDef("senate_buy_count_90d", _senate_buy_count_90d, ("close",), category="senate"),
+    PostComputeFieldDef("senate_sell_count_90d", _senate_sell_count_90d, ("close",), category="senate"),
+    PostComputeFieldDef("senate_net_flow_90d", _senate_net_flow_90d, ("close",), category="senate"),
+    PostComputeFieldDef("senate_activity_flag", _senate_activity_flag, ("close",), category="senate"),
+    # Analyst grades
+    PostComputeFieldDef("upgrades_90d", _upgrades_90d, ("close",), category="analyst"),
+    PostComputeFieldDef("downgrades_90d", _downgrades_90d, ("close",), category="analyst"),
+    PostComputeFieldDef("upgrade_downgrade_ratio", _upgrade_downgrade_ratio, ("close",), category="analyst"),
 ]
 
 POST_COMPUTE_REGISTRY: dict[str, PostComputeFieldDef] = {

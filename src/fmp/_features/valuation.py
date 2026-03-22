@@ -144,4 +144,8 @@ FEATURES = [
         ),
         category="valuation",
     ),
+    # ── DCF-based ─────────────────────────────────────────────────
+    _d("dcf_value", "dcf_val", ("dcf_val",), category="valuation"),
+    _d("dcf_upside", "(dcf_val - price) / NULLIF(price, 0)", ("dcf_val", "price"), category="valuation"),
+    _d("dcf_margin_of_safety", "(dcf_val - price) / NULLIF(dcf_val, 0)", ("dcf_val", "price"), category="valuation"),
 ]

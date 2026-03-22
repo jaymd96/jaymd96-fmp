@@ -43,4 +43,16 @@ FEATURES = [
         category="event_driven",
         lag=True,
     ),
+    # ── Pre-computed multi-period returns from FMP ─────────────────
+    _d("fmp_ret_1d", "fmp_return_1d", ("fmp_return_1d",), category="event_driven"),
+    _d("fmp_ret_5d", "fmp_return_5d", ("fmp_return_5d",), category="event_driven"),
+    _d("fmp_ret_1m", "fmp_return_1m", ("fmp_return_1m",), category="event_driven"),
+    _d("fmp_ret_3m", "fmp_return_3m", ("fmp_return_3m",), category="event_driven"),
+    _d("fmp_ret_6m", "fmp_return_6m", ("fmp_return_6m",), category="event_driven"),
+    _d("fmp_ret_ytd", "fmp_return_ytd", ("fmp_return_ytd",), category="event_driven"),
+    _d("fmp_ret_1y", "fmp_return_1y", ("fmp_return_1y",), category="event_driven"),
+    _d("fmp_ret_3y", "fmp_return_3y", ("fmp_return_3y",), category="event_driven"),
+    _d("fmp_ret_5y", "fmp_return_5y", ("fmp_return_5y",), category="event_driven"),
+    # ── Split features ─────────────────────────────────────────────
+    _d("split_ratio", "split_numerator / NULLIF(split_denominator, 0)", ("split_numerator", "split_denominator"), category="event_driven"),
 ]

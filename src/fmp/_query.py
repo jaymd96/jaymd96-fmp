@@ -153,6 +153,7 @@ class QueryBuilder:
         reference_data: dict[str, Any] = {}
         if post_compute_defs:
             reference_data = self._fetch_reference_data(post_compute_defs, grouped)
+            reference_data["http"] = self._http
 
         # 6. Generate SQL (with derived expressions)
         sql = self._generate_sql(grouped, target, derived_defs)
