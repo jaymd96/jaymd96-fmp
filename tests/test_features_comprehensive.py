@@ -815,13 +815,11 @@ def test_earnings_quality(httpx_mock):
         json=[{
             "symbol": "AAPL",
             "date": report_date,  # Must match other datasets for LEFT JOIN
-            "eps": eps_actual,
+            "epsActual": eps_actual,
             "epsEstimated": eps_est,
-            "revenue": 89498000000,
+            "revenueActual": 89498000000,
             "revenueEstimated": 89300000000,
-            "time": "amc",
-            "fiscalDateEnding": report_date,
-            "updatedFromDate": "2023-10-26",
+            "lastUpdated": "2023-10-26",
         }],
     )
 

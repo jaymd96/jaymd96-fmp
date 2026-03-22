@@ -78,7 +78,7 @@ _DAILY_PRICE = DatasetDef(
         "high":       _f("high",      "high",            agg="max"),
         "low":        _f("low",       "low",             agg="min"),
         "close":      _f("close",     "close",           agg="last"),
-        "adj_close":  _f("adj_close", "adjClose",        agg="last"),
+        "adj_close":  _f("adj_close", "adjClose",          agg="last"),
         "volume":     _f("volume",    "volume", "BIGINT", agg="sum"),
         "vwap":       _f("vwap",      "vwap",            agg="mean"),
         "change":     _f("change",    "change",          agg="sum"),
@@ -303,7 +303,7 @@ _PROFILE = DatasetDef(
         "currency":             _f("currency",             "currency",           "VARCHAR"),
         "cik":                  _f("cik",                  "cik",                "VARCHAR"),
         "isin":                 _f("isin",                 "isin",               "VARCHAR"),
-        "exchange_short":       _f("exchange_short",       "exchangeShortName",  "VARCHAR"),
+        "exchange_short":       _f("exchange_short",       "exchange",           "VARCHAR"),
         "industry":             _f("industry",             "industry",           "VARCHAR"),
         "sector":               _f("sector",               "sector",             "VARCHAR"),
         "country":              _f("country",              "country",            "VARCHAR"),
@@ -325,13 +325,11 @@ _EARNINGS = DatasetDef(
     keys=("symbol", "date"),
     ttl_category="earnings_calendar",
     fields={
-        "earnings_eps":           _f("earnings_eps",           "eps"),
+        "earnings_eps":           _f("earnings_eps",           "epsActual"),
         "eps_estimated":          _f("eps_estimated",          "epsEstimated"),
-        "earnings_revenue":       _f("earnings_revenue",       "revenue",           "BIGINT", agg="sum"),
+        "earnings_revenue":       _f("earnings_revenue",       "revenueActual",     "BIGINT", agg="sum"),
         "revenue_estimated":      _f("revenue_estimated",      "revenueEstimated",  "BIGINT", agg="sum"),
-        "earnings_time":          _f("earnings_time",          "time",              "VARCHAR"),
-        "fiscal_date_ending":     _f("fiscal_date_ending",     "fiscalDateEnding",  "DATE"),
-        "updated_from_date":      _f("updated_from_date",      "updatedFromDate",   "DATE"),
+        "earnings_last_updated":  _f("earnings_last_updated",  "lastUpdated",       "DATE"),
     },
 )
 
@@ -354,10 +352,9 @@ _ENTERPRISE_VALUES = DatasetDef(
     name="enterprise_values",
     endpoint="enterprise-values",
     grain=Grain.QUARTERLY,
-    keys=("symbol", "date", "period"),
+    keys=("symbol", "date"),
     ttl_category="financial_statements",
     fields={
-        "ev_calendar_year":       _f("ev_calendar_year",       "calendarYear",       "VARCHAR"),
         "stock_price_ev":         _f("stock_price_ev",         "stockPrice"),
         "shares_outstanding_ev":  _f("shares_outstanding_ev",  "numberOfShares",     "BIGINT"),
         "ev_market_cap":          _f("ev_market_cap",          "marketCapitalization","BIGINT"),
@@ -451,14 +448,14 @@ _RATINGS = DatasetDef(
     keys=("symbol",),
     ttl_category="analyst",
     fields={
-        "fmp_rating":        _f("fmp_rating",        "rating",              "VARCHAR"),
-        "fmp_rating_score":  _f("fmp_rating_score",  "ratingScore",         "INTEGER"),
-        "fmp_dcf_score":     _f("fmp_dcf_score",     "ratingDetailsDCFScore","INTEGER"),
-        "fmp_roe_score":     _f("fmp_roe_score",     "ratingDetailsROEScore","INTEGER"),
-        "fmp_roa_score":     _f("fmp_roa_score",     "ratingDetailsROAScore","INTEGER"),
-        "fmp_de_score":      _f("fmp_de_score",      "ratingDetailsDEScore", "INTEGER"),
-        "fmp_pe_score":      _f("fmp_pe_score",      "ratingDetailsPEScore", "INTEGER"),
-        "fmp_pb_score":      _f("fmp_pb_score",      "ratingDetailsPBScore", "INTEGER"),
+        "fmp_rating":        _f("fmp_rating",        "rating",                    "VARCHAR"),
+        "fmp_rating_score":  _f("fmp_rating_score",  "overallScore",              "INTEGER"),
+        "fmp_dcf_score":     _f("fmp_dcf_score",     "discountedCashFlowScore",   "INTEGER"),
+        "fmp_roe_score":     _f("fmp_roe_score",     "returnOnEquityScore",       "INTEGER"),
+        "fmp_roa_score":     _f("fmp_roa_score",     "returnOnAssetsScore",       "INTEGER"),
+        "fmp_de_score":      _f("fmp_de_score",      "debtToEquityScore",         "INTEGER"),
+        "fmp_pe_score":      _f("fmp_pe_score",      "priceToEarningsScore",      "INTEGER"),
+        "fmp_pb_score":      _f("fmp_pb_score",      "priceToBookScore",          "INTEGER"),
     },
 )
 
@@ -495,7 +492,7 @@ _DCF_DATA = DatasetDef(
     ttl_category="dcf",
     fields={
         "dcf_val":        _f("dcf_val",        "dcf"),
-        "dcf_stock_price": _f("dcf_stock_price", "stockPrice"),
+        "dcf_stock_price": _f("dcf_stock_price", "Stock Price"),
     },
 )
 
