@@ -174,6 +174,32 @@ class BitemporalStore:
         cols = [desc[0] for desc in result.description]
         return [dict(zip(cols, row)) for row in result.fetchall()]
 
+    def read_raw(
+        self,
+        dataset: str,
+        symbols: list[str] | None = None,
+        start: str | None = None,
+        end: str | None = None,
+    ) -> list[dict]:
+        """Read deduped rows with original API (camelCase) field names.
+
+        Useful for consumers that expect the raw FMP response format.
+        """
+        ds = DATASETS[dataset]
+
+        # Build col_to_api mapping (snake_case → camelCase)
+        col_to_api: dict[str, str] = {}
+        for field in ds.fields.values():
+            col_to_api[field.name] = field.api_name
+        for k in ds.keys:
+            col_to_api[k] = k  # symbol, date, period stay as-is
+
+        rows = self.read(dataset, symbols or [], start, end)
+        return [
+            {col_to_api.get(k, k): v for k, v in row.items()}
+            for row in rows
+        ]
+
     # ------------------------------------------------------------------
     # Freshness check
     # ------------------------------------------------------------------

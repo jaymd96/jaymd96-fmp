@@ -306,6 +306,7 @@ _PROFILE = DatasetDef(
         "cik":                  _f("cik",                  "cik",                "VARCHAR"),
         "isin":                 _f("isin",                 "isin",               "VARCHAR"),
         "exchange_short":       _f("exchange_short",       "exchange",           "VARCHAR"),
+        "exchange_full":        _f("exchange_full",        "exchangeFullName",   "VARCHAR"),
         "industry":             _f("industry",             "industry",           "VARCHAR"),
         "sector":               _f("sector",               "sector",             "VARCHAR"),
         "country":              _f("country",              "country",            "VARCHAR"),
@@ -315,8 +316,14 @@ _PROFILE = DatasetDef(
         "website":              _f("website",              "website",            "VARCHAR"),
         "ipo_date":             _f("ipo_date",             "ipoDate",            "DATE"),
         "beta":                 _f("beta",                 "beta"),
+        "profile_market_cap":   _f("profile_market_cap",   "marketCap",          "BIGINT"),
+        "profile_price":        _f("profile_price",        "price"),
+        "profile_volume":       _f("profile_volume",       "volume",             "BIGINT"),
         "is_etf":               _f("is_etf",               "isEtf",              "BOOLEAN"),
+        "is_fund":              _f("is_fund",              "isFund",             "BOOLEAN"),
+        "is_adr":               _f("is_adr",               "isAdr",              "BOOLEAN"),
         "is_actively_trading":  _f("is_actively_trading",  "isActivelyTrading",  "BOOLEAN"),
+        "default_image":        _f("default_image",        "defaultImage",       "BOOLEAN"),
     },
 )
 
