@@ -53,6 +53,7 @@ class DatasetDef:
     keys: tuple[str, ...]
     ttl_category: str
     fields: dict[str, FieldDef]
+    date_api_name: str = "date"  # API field name that maps to the ``date`` key
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -647,6 +648,24 @@ _DELISTED_COMPANIES = DatasetDef(
     },
 )
 
+_MERGERS_ACQUISITIONS = DatasetDef(
+    name="mergers_acquisitions",
+    endpoint="mergers-acquisitions-latest",
+    grain=Grain.DAILY,
+    keys=("symbol", "date"),
+    ttl_category="sec_filings",
+    date_api_name="transactionDate",
+    fields={
+        "ma_company_name":       _f("ma_company_name",       "companyName",         "VARCHAR"),
+        "ma_cik":                _f("ma_cik",                "cik",                 "VARCHAR"),
+        "targeted_company_name": _f("targeted_company_name", "targetedCompanyName", "VARCHAR"),
+        "targeted_cik":          _f("targeted_cik",          "targetedCik",         "VARCHAR"),
+        "targeted_symbol":       _f("targeted_symbol",       "targetedSymbol",      "VARCHAR"),
+        "accepted_date":         _f("ma_accepted_date",      "acceptedDate",        "VARCHAR"),
+        "ma_link":               _f("ma_link",               "link",                "VARCHAR"),
+    },
+)
+
 _HISTORICAL_INSTITUTIONAL = DatasetDef(
     name="historical_institutional",
     endpoint="institutional-ownership/symbol-positions-summary",
@@ -702,6 +721,7 @@ DATASETS: dict[str, DatasetDef] = {
         _HISTORICAL_RATINGS,
         _HISTORICAL_INSTITUTIONAL,
         _DELISTED_COMPANIES,
+        _MERGERS_ACQUISITIONS,
     ]
 }
 

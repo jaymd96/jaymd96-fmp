@@ -81,7 +81,7 @@ class BitemporalStore:
 
         # Also map key columns that come from the API
         api_to_col.setdefault("symbol", "symbol")
-        api_to_col.setdefault("date", "date")
+        api_to_col.setdefault(ds.date_api_name, "date")
         if "period" in ds.keys:
             api_to_col.setdefault("period", "period")
 

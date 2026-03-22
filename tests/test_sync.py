@@ -170,9 +170,10 @@ def test_sync_all(httpx_mock):
             json=[],
         )
         # financial_scores uses per-symbol (not bulk) — no mock needed here
-    # Paginated profile bulk, delisted companies, batch (shares float), treasury rates
+    # Paginated bulk, batch, treasury rates
     httpx_mock.add_response(url=re.compile(r".*/profile-bulk.*"), json=[])
     httpx_mock.add_response(url=re.compile(r".*/delisted-companies.*"), json=[])
+    httpx_mock.add_response(url=re.compile(r".*/mergers-acquisitions-latest.*"), json=[])
     httpx_mock.add_response(url=re.compile(r".*/shares-float-all.*"), json=[])
     httpx_mock.add_response(url=re.compile(r".*/treasury-rates.*"), json=[])
 

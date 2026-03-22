@@ -38,6 +38,7 @@ BULK_YEARLY: dict[str, tuple[str, bool, bool]] = {
 BULK_PAGINATED: dict[str, tuple[str, str, int]] = {
     "profile": ("profile-bulk", "part", 1000),
     "delisted_companies": ("delisted-companies", "page", 100),
+    "mergers_acquisitions": ("mergers-acquisitions-latest", "page", 100),
 }
 
 # dataset → (bulk_endpoint, requires_year)
