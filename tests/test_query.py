@@ -32,7 +32,7 @@ def test_no_fields_raises(query_client):
 
 
 def test_unknown_field_raises(query_client):
-    with pytest.raises(ValueError, match="Unknown fields"):
+    with pytest.raises(FMPError, match="Unknown field"):
         (query_client.query()
          .symbols("AAPL")
          .select("close", "nonexistent_field_xyz")

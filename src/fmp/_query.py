@@ -6,7 +6,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Any
 
 from fmp._exceptions import FMPError
-from fmp._ontology import DATASETS, Grain, resolve_fields
+from fmp._features import DERIVED_REGISTRY, resolve_derived_dependencies
+from fmp._features._base import DerivedFieldDef
+from fmp._ontology import DATASETS, FIELD_REGISTRY, Grain, resolve_fields
 
 if TYPE_CHECKING:
     from fmp._http import HTTPClient
@@ -108,19 +110,41 @@ class QueryBuilder:
         if not self._fields:
             raise FMPError("No fields specified. Call .select() first.")
 
-        # 1. Resolve fields → datasets
-        grouped = resolve_fields(self._fields)
+        # 1. Split into base and derived fields.
+        #    Derived takes priority when a name exists in both registries
+        #    (e.g., ratios endpoint pre-computes some metrics we also derive).
+        base_fields: list[str] = []
+        derived_names: list[str] = []
+        for f in self._fields:
+            if f in DERIVED_REGISTRY:
+                derived_names.append(f)
+            elif f in FIELD_REGISTRY:
+                base_fields.append(f)
+            else:
+                raise FMPError(f"Unknown field: {f!r}")
 
-        # 2. Determine target grain
+        # 2. Resolve derived dependencies → additional base fields
+        derived_defs: list[DerivedFieldDef] = []
+        if derived_names:
+            dep_bases, derived_defs = resolve_derived_dependencies(derived_names)
+            # Add dependency base fields (not already requested)
+            for dep in dep_bases:
+                if dep not in base_fields and dep in FIELD_REGISTRY:
+                    base_fields.append(dep)
+
+        # 3. Resolve base fields → datasets
+        grouped = resolve_fields(base_fields) if base_fields else {}
+
+        # 4. Determine target grain
         target = self._resolve_target_grain(grouped)
 
-        # 3. Fetch data into typed tables
+        # 5. Fetch data into typed tables
         self._fetch_datasets(grouped)
 
-        # 4. Generate SQL
-        sql = self._generate_sql(grouped, target)
+        # 6. Generate SQL (with derived expressions)
+        sql = self._generate_sql(grouped, target, derived_defs)
 
-        # 5. Execute and return
+        # 7. Execute and return
         result = self._store._conn.execute(sql)
 
         if backend == "polars":
@@ -209,6 +233,7 @@ class QueryBuilder:
         self,
         grouped: dict[str, list],
         target: Grain,
+        derived: list[DerivedFieldDef] | None = None,
     ) -> str:
         """Build the full CTE-based SQL query."""
         ctes: list[str] = []
@@ -279,23 +304,34 @@ class QueryBuilder:
             aligned_names.append(aligned_name)
             dataset_infos.append((aligned_name, ds.grain, fields))
 
-        # ── Final SELECT with joins ──
+        # ── Build field-to-alias mapping and SELECT ──
+        derived = derived or []
+
         if len(dataset_infos) == 1:
             name, grain, fields = dataset_infos[0]
-            field_names = [f.name for f in fields]
-            if grain == Grain.SNAPSHOT:
-                return f"WITH {', '.join(ctes)}\nSELECT symbol, {', '.join(field_names)}\nFROM {name}\nORDER BY symbol"
-            else:
-                return f"WITH {', '.join(ctes)}\nSELECT symbol, date, {', '.join(field_names)}\nFROM {name}\nORDER BY symbol, date"
+            field_to_alias: dict[str, str] = {f.name: f.name for f in fields}
+            base_cols = [f.name for f in fields]
+            key_cols = ["symbol"] + (["date"] if grain != Grain.SNAPSHOT else [])
+            derived_exprs = self._resolve_derived_exprs(derived, field_to_alias)
+            all_cols = key_cols + base_cols + derived_exprs
+            has_lag = any(d.requires_lag for d in derived)
+            window = (
+                f"\nWINDOW w AS (PARTITION BY symbol ORDER BY date)"
+                if has_lag else ""
+            )
+            return (
+                f"WITH {', '.join(ctes)}\n"
+                f"SELECT {', '.join(all_cols)}\n"
+                f"FROM {name}{window}\n"
+                f"ORDER BY {', '.join(key_cols)}"
+            )
 
         # Multiple datasets — need joins
-        # Separate into anchor (target grain) and others
         anchor = None
         others: list[tuple[str, Grain, list]] = []
         for info in dataset_infos:
             name, grain, fields = info
             if grain == target or (grain != Grain.SNAPSHOT and grain < target):
-                # This one has been aggregated to the target grain, or matches
                 if anchor is None:
                     anchor = info
                 else:
@@ -304,26 +340,26 @@ class QueryBuilder:
                 others.append(info)
 
         if anchor is None:
-            # All are coarser or snapshot — pick the first non-snapshot
             for i, info in enumerate(dataset_infos):
                 if info[1] != Grain.SNAPSHOT:
                     anchor = info
                     others = [x for j, x in enumerate(dataset_infos) if j != i]
                     break
             if anchor is None:
-                # All snapshot
                 anchor = dataset_infos[0]
                 others = dataset_infos[1:]
 
         anchor_name, anchor_grain, anchor_fields = anchor
         anchor_alias = "t0"
 
-        # Build SELECT columns
+        # Build field-to-alias mapping
+        field_to_alias = {}
         select_parts = [f"{anchor_alias}.symbol"]
         if anchor_grain != Grain.SNAPSHOT:
             select_parts.append(f"{anchor_alias}.date")
         for f in anchor_fields:
             select_parts.append(f"{anchor_alias}.{f.name}")
+            field_to_alias[f.name] = f"{anchor_alias}.{f.name}"
 
         # Build JOIN clauses
         join_clauses: list[str] = []
@@ -331,20 +367,19 @@ class QueryBuilder:
             alias = f"t{i}"
             for f in fields:
                 select_parts.append(f"{alias}.{f.name}")
+                field_to_alias[f.name] = f"{alias}.{f.name}"
 
             if grain == Grain.SNAPSHOT:
                 join_clauses.append(
                     f"LEFT JOIN {name} {alias} ON {anchor_alias}.symbol = {alias}.symbol"
                 )
             elif grain > target:
-                # Coarser than target → ASOF JOIN (carry forward)
                 join_clauses.append(
                     f"ASOF JOIN {name} {alias} "
                     f"ON {anchor_alias}.symbol = {alias}.symbol "
                     f"AND {anchor_alias}.date >= {alias}.date"
                 )
             else:
-                # Same grain or already aggregated
                 if anchor_grain == Grain.SNAPSHOT:
                     join_clauses.append(
                         f"LEFT JOIN {name} {alias} ON {anchor_alias}.symbol = {alias}.symbol"
@@ -356,17 +391,47 @@ class QueryBuilder:
                         f"AND {anchor_alias}.date = {alias}.date"
                     )
 
+        # Add derived expressions
+        derived_exprs = self._resolve_derived_exprs(derived, field_to_alias)
+        select_parts.extend(derived_exprs)
+
         select_str = ",\n       ".join(select_parts)
         joins_str = "\n".join(join_clauses)
         order = f"{anchor_alias}.symbol"
         if anchor_grain != Grain.SNAPSHOT:
             order += f", {anchor_alias}.date"
 
+        has_lag = any(d.requires_lag for d in derived)
+        window = (
+            f"\nWINDOW w AS (PARTITION BY {anchor_alias}.symbol ORDER BY {anchor_alias}.date)"
+            if has_lag else ""
+        )
+
         final = (
             f"WITH {','.join(chr(10) + cte for cte in ctes)}\n"
             f"SELECT {select_str}\n"
             f"FROM {anchor_name} {anchor_alias}\n"
-            f"{joins_str}\n"
+            f"{joins_str}{window}\n"
             f"ORDER BY {order}"
         )
         return final
+
+    @staticmethod
+    def _resolve_derived_exprs(
+        derived: list[DerivedFieldDef],
+        field_to_alias: dict[str, str],
+    ) -> list[str]:
+        """Substitute base field references with table aliases in derived expressions."""
+        results: list[str] = []
+        for d in derived:
+            expr = d.expression
+            # Replace base field names with aliased versions.
+            # Sort by length descending to avoid partial matches.
+            for field_name in sorted(field_to_alias, key=len, reverse=True):
+                alias = field_to_alias[field_name]
+                if alias != field_name:
+                    # Use word-boundary replacement to avoid partial matches
+                    import re
+                    expr = re.sub(rf'\b{re.escape(field_name)}\b', alias, expr)
+            results.append(f"({expr}) AS {d.name}")
+        return results

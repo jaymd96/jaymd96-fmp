@@ -117,6 +117,12 @@ _INCOME_STATEMENT = DatasetDef(
         "eps_diluted":         _f("eps_diluted",         "epsdiluted",       agg="sum"),
         "weighted_avg_shares": _f("weighted_avg_shares", "weightedAverageShsOut", "BIGINT", agg="last"),
         "weighted_avg_shares_diluted": _f("weighted_avg_shares_diluted", "weightedAverageShsOutDil", "BIGINT", agg="last"),
+        "income_before_tax":   _f("income_before_tax",   "incomeBeforeTax",  "BIGINT", agg="sum"),
+        "income_tax_expense":  _f("income_tax_expense",  "incomeTaxExpense", "BIGINT", agg="sum"),
+        "depreciation_and_amortization": _f("depreciation_and_amortization", "depreciationAndAmortization", "BIGINT", agg="sum"),
+        "cost_and_expenses":   _f("cost_and_expenses",   "costAndExpenses",  "BIGINT", agg="sum"),
+        "other_expenses":      _f("other_expenses",      "otherExpenses",    "BIGINT", agg="sum"),
+        "total_other_income":  _f("total_other_income",  "totalOtherIncomeExpensesNet", "BIGINT", agg="sum"),
         "link":                _f("link",                "link",             "VARCHAR"),
         "final_link":          _f("final_link",          "finalLink",        "VARCHAR"),
     },
@@ -154,6 +160,18 @@ _BALANCE_SHEET = DatasetDef(
         "total_liabilities_and_equity": _f("total_liabilities_and_equity", "totalLiabilitiesAndStockholdersEquity", "BIGINT"),
         "total_debt":                _f("total_debt",                "totalDebt",                "BIGINT"),
         "net_debt":                  _f("net_debt",                  "netDebt",                  "BIGINT"),
+        "retained_earnings":         _f("retained_earnings",         "retainedEarnings",         "BIGINT"),
+        "common_stock":              _f("common_stock",              "commonStock",              "BIGINT"),
+        "other_current_assets":      _f("other_current_assets",      "otherCurrentAssets",       "BIGINT"),
+        "other_non_current_assets":  _f("other_non_current_assets",  "otherNonCurrentAssets",    "BIGINT"),
+        "deferred_revenue":          _f("deferred_revenue",          "deferredRevenue",          "BIGINT"),
+        "tax_payables":              _f("tax_payables",              "taxPayables",              "BIGINT"),
+        "minority_interest":         _f("minority_interest",         "minorityInterest",         "BIGINT"),
+        "goodwill_and_intangibles":  _f("goodwill_and_intangibles",  "goodwillAndIntangibleAssets", "BIGINT"),
+        "other_assets":              _f("other_assets",              "otherAssets",              "BIGINT"),
+        "other_liabilities":         _f("other_liabilities",         "otherLiabilities",         "BIGINT"),
+        "total_investments":         _f("total_investments",         "totalInvestments",         "BIGINT"),
+        "capital_lease_obligations": _f("capital_lease_obligations", "capitalLeaseObligations",  "BIGINT"),
     },
 )
 
@@ -339,6 +357,39 @@ _DIVIDENDS = DatasetDef(
     },
 )
 
+_ENTERPRISE_VALUES = DatasetDef(
+    name="enterprise_values",
+    endpoint="enterprise-values",
+    grain=Grain.QUARTERLY,
+    keys=("symbol", "date", "period"),
+    ttl_category="financial_statements",
+    fields={
+        "ev_calendar_year":       _f("ev_calendar_year",       "calendarYear",       "VARCHAR"),
+        "stock_price_ev":         _f("stock_price_ev",         "stockPrice"),
+        "shares_outstanding_ev":  _f("shares_outstanding_ev",  "numberOfShares",     "BIGINT"),
+        "ev_market_cap":          _f("ev_market_cap",          "marketCapitalization","BIGINT"),
+        "minus_cash":             _f("minus_cash",             "minusCashAndCashEquivalents", "BIGINT"),
+        "plus_debt":              _f("plus_debt",              "addTotalDebt",       "BIGINT"),
+        "enterprise_value":      _f("enterprise_value",       "enterpriseValue",    "BIGINT"),
+    },
+)
+
+_FINANCIAL_SCORES = DatasetDef(
+    name="financial_scores",
+    endpoint="financial-scores",
+    grain=Grain.SNAPSHOT,
+    keys=("symbol",),
+    ttl_category="key_metrics",
+    fields={
+        "altman_z_score_fmp":    _f("altman_z_score_fmp",    "altmanZScore"),
+        "piotroski_score_fmp":   _f("piotroski_score_fmp",   "piotroskiScore"),
+        "working_capital_score": _f("working_capital_score",  "workingCapital"),
+        "retained_earnings_score": _f("retained_earnings_score", "retainedEarnings"),
+        "operating_cash_flow_score": _f("operating_cash_flow_score", "operatingCashFlow"),
+        "total_assets_score":    _f("total_assets_score",     "totalAssets"),
+    },
+)
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Registry
@@ -357,6 +408,8 @@ DATASETS: dict[str, DatasetDef] = {
         _PROFILE,
         _EARNINGS,
         _DIVIDENDS,
+        _ENTERPRISE_VALUES,
+        _FINANCIAL_SCORES,
     ]
 }
 
@@ -377,24 +430,35 @@ def resolve_fields(
     Returns a dict keyed by dataset name, each value being the list of
     :class:`FieldDef` objects requested from that dataset.
 
-    Raises :class:`ValueError` for unknown field names.
+    Raises :class:`ValueError` for unknown field names (checks both base
+    and derived registries).
     """
-    unknown = [n for n in names if n not in FIELD_REGISTRY]
+    from fmp._features import DERIVED_REGISTRY
+
+    unknown = [
+        n for n in names
+        if n not in FIELD_REGISTRY and n not in DERIVED_REGISTRY
+    ]
     if unknown:
         raise ValueError(f"Unknown fields: {unknown}")
 
+    # Only resolve base fields here; derived fields are handled by the
+    # query builder which calls resolve_derived_dependencies separately.
     grouped: dict[str, list[FieldDef]] = {}
     for name in names:
-        ds_name, field_def = FIELD_REGISTRY[name]
-        grouped.setdefault(ds_name, []).append(field_def)
+        if name in FIELD_REGISTRY:
+            ds_name, field_def = FIELD_REGISTRY[name]
+            grouped.setdefault(ds_name, []).append(field_def)
     return grouped
 
 
 def list_fields(dataset: str | None = None) -> list[str]:
-    """List available field names, optionally filtered by dataset."""
+    """List available field names (base + derived), optionally filtered by dataset."""
+    from fmp._features import DERIVED_REGISTRY
+
     if dataset:
         ds = DATASETS.get(dataset)
         if not ds:
             raise ValueError(f"Unknown dataset: {dataset}")
         return list(ds.fields.keys())
-    return list(FIELD_REGISTRY.keys())
+    return sorted(set(list(FIELD_REGISTRY.keys()) + list(DERIVED_REGISTRY.keys())))

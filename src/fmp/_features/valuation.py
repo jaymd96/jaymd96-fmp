@@ -1,0 +1,145 @@
+"""§6 — Valuation derived features.
+
+``forward_pe`` and ``peg_ratio`` are omitted because analyst-estimate data
+is not yet in the ontology.
+"""
+
+from __future__ import annotations
+
+from fmp._features._base import _d
+
+FEATURES = [
+    # ── Price multiples ────────────────────────────────────────────
+    _d(
+        "pe_derived",
+        "quote_market_cap / NULLIF(net_income, 0)",
+        ("quote_market_cap", "net_income"),
+        category="valuation",
+    ),
+    # (forward_pe skipped — needs analyst estimates)
+    # (peg_ratio skipped — needs analyst estimates)
+    _d(
+        "price_to_sales_derived",
+        "quote_market_cap / NULLIF(revenue, 0)",
+        ("quote_market_cap", "revenue"),
+        category="valuation",
+    ),
+    _d(
+        "price_to_book",
+        "quote_market_cap / NULLIF(total_stockholders_equity, 0)",
+        ("quote_market_cap", "total_stockholders_equity"),
+        category="valuation",
+    ),
+    _d(
+        "price_to_tangible_book",
+        "quote_market_cap"
+        " / NULLIF(total_stockholders_equity - goodwill_and_intangibles, 0)",
+        (
+            "quote_market_cap",
+            "total_stockholders_equity",
+            "goodwill_and_intangibles",
+        ),
+        category="valuation",
+    ),
+    _d(
+        "price_to_cf",
+        "quote_market_cap / NULLIF(operating_cash_flow, 0)",
+        ("quote_market_cap", "operating_cash_flow"),
+        category="valuation",
+    ),
+    _d(
+        "price_to_fcf",
+        "quote_market_cap / NULLIF(free_cash_flow, 0)",
+        ("quote_market_cap", "free_cash_flow"),
+        category="valuation",
+    ),
+    # ── EV multiples ───────────────────────────────────────────────
+    _d(
+        "ev_to_revenue",
+        "enterprise_value / NULLIF(revenue, 0)",
+        ("enterprise_value", "revenue"),
+        category="valuation",
+    ),
+    _d(
+        "ev_to_ebitda_derived",
+        "enterprise_value / NULLIF(ebitda, 0)",
+        ("enterprise_value", "ebitda"),
+        category="valuation",
+    ),
+    _d(
+        "ev_to_ebit",
+        "enterprise_value"
+        " / NULLIF(ebitda - depreciation_and_amortization, 0)",
+        ("enterprise_value", "ebitda", "depreciation_and_amortization"),
+        category="valuation",
+    ),
+    _d(
+        "ev_to_fcf_derived",
+        "enterprise_value / NULLIF(free_cash_flow, 0)",
+        ("enterprise_value", "free_cash_flow"),
+        category="valuation",
+    ),
+    _d(
+        "ev_to_ic",
+        "enterprise_value"
+        " / NULLIF(total_debt + total_stockholders_equity - cash_and_equivalents, 0)",
+        (
+            "enterprise_value",
+            "total_debt",
+            "total_stockholders_equity",
+            "cash_and_equivalents",
+        ),
+        category="valuation",
+    ),
+    _d(
+        "ev_to_gross_profit",
+        "enterprise_value / NULLIF(gross_profit, 0)",
+        ("enterprise_value", "gross_profit"),
+        category="valuation",
+    ),
+    # ── Yield metrics ──────────────────────────────────────────────
+    _d(
+        "earnings_yield_derived",
+        "net_income / NULLIF(quote_market_cap, 0)",
+        ("net_income", "quote_market_cap"),
+        category="valuation",
+    ),
+    _d(
+        "fcf_yield_derived",
+        "free_cash_flow / NULLIF(quote_market_cap, 0)",
+        ("free_cash_flow", "quote_market_cap"),
+        category="valuation",
+    ),
+    _d(
+        "shareholder_yield",
+        "(-share_repurchase - dividends_paid)"
+        " / NULLIF(quote_market_cap, 0)",
+        ("share_repurchase", "dividends_paid", "quote_market_cap"),
+        category="valuation",
+    ),
+    # ── Composite / other ──────────────────────────────────────────
+    _d(
+        "tobins_q",
+        "(quote_market_cap + total_liabilities)"
+        " / NULLIF(total_assets, 0)",
+        ("quote_market_cap", "total_liabilities", "total_assets"),
+        category="valuation",
+    ),
+    _d(
+        "ev_per_share",
+        "enterprise_value / NULLIF(weighted_avg_shares_diluted, 0)",
+        ("enterprise_value", "weighted_avg_shares_diluted"),
+        category="valuation",
+    ),
+    _d(
+        "price_to_working_capital",
+        "quote_market_cap"
+        " / NULLIF(total_current_assets - total_current_liabilities, 0)",
+        (
+            "quote_market_cap",
+            "total_current_assets",
+            "total_current_liabilities",
+        ),
+        category="valuation",
+    ),
+]
