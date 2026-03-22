@@ -178,17 +178,32 @@ class BitemporalStore:
     # Freshness check
     # ------------------------------------------------------------------
 
-    def is_fresh(self, dataset: str, symbol: str, ttl: int) -> bool:
-        """Return True if data for *symbol* was fetched within *ttl* seconds."""
-        row = self._conn.execute(
-            f"""
-            SELECT 1 FROM {dataset}
-            WHERE symbol = ?
-              AND _fetched_at + (? || ' seconds')::INTERVAL > now()
-            LIMIT 1
-            """,
-            [symbol, ttl],
-        ).fetchone()
+    def is_fresh(self, dataset: str, symbol: str | None, ttl: int) -> bool:
+        """Return True if data was fetched within *ttl* seconds.
+
+        For symbol-keyed datasets, checks freshness per symbol.
+        For date-only datasets (e.g., treasury_rates), *symbol* is ignored.
+        """
+        ds = DATASETS[dataset]
+        if "symbol" in ds.keys and symbol:
+            row = self._conn.execute(
+                f"""
+                SELECT 1 FROM {dataset}
+                WHERE symbol = ?
+                  AND _fetched_at + (? || ' seconds')::INTERVAL > now()
+                LIMIT 1
+                """,
+                [symbol, ttl],
+            ).fetchone()
+        else:
+            row = self._conn.execute(
+                f"""
+                SELECT 1 FROM {dataset}
+                WHERE _fetched_at + (? || ' seconds')::INTERVAL > now()
+                LIMIT 1
+                """,
+                [ttl],
+            ).fetchone()
         return row is not None
 
     # ------------------------------------------------------------------

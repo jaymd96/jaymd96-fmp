@@ -374,6 +374,126 @@ _ENTERPRISE_VALUES = DatasetDef(
     },
 )
 
+_TREASURY_RATES = DatasetDef(
+    name="treasury_rates",
+    endpoint="treasury-rates",
+    grain=Grain.DAILY,
+    keys=("date",),  # No symbol — market-wide data, joins on date only
+    ttl_category="economic_indicators",
+    fields={
+        "rate_1m":  _f("rate_1m",  "month1"),
+        "rate_2m":  _f("rate_2m",  "month2"),
+        "rate_3m":  _f("rate_3m",  "month3"),
+        "rate_6m":  _f("rate_6m",  "month6"),
+        "rate_1y":  _f("rate_1y",  "year1"),
+        "rate_2y":  _f("rate_2y",  "year2"),
+        "rate_3y":  _f("rate_3y",  "year3"),
+        "rate_5y":  _f("rate_5y",  "year5"),
+        "rate_7y":  _f("rate_7y",  "year7"),
+        "rate_10y": _f("rate_10y", "year10"),
+        "rate_20y": _f("rate_20y", "year20"),
+        "rate_30y": _f("rate_30y", "year30"),
+    },
+)
+
+_ANALYST_ESTIMATES = DatasetDef(
+    name="analyst_estimates",
+    endpoint="analyst-estimates",
+    grain=Grain.QUARTERLY,
+    keys=("symbol", "date"),
+    ttl_category="analyst",
+    fields={
+        "est_revenue_low":     _f("est_revenue_low",     "estimatedRevenueLow",      "BIGINT"),
+        "est_revenue_high":    _f("est_revenue_high",    "estimatedRevenueHigh",     "BIGINT"),
+        "est_revenue_avg":     _f("est_revenue_avg",     "estimatedRevenueAvg",      "BIGINT"),
+        "est_ebitda_low":      _f("est_ebitda_low",      "estimatedEbitdaLow",       "BIGINT"),
+        "est_ebitda_high":     _f("est_ebitda_high",     "estimatedEbitdaHigh",      "BIGINT"),
+        "est_ebitda_avg":      _f("est_ebitda_avg",      "estimatedEbitdaAvg",       "BIGINT"),
+        "est_eps_low":         _f("est_eps_low",         "estimatedEpsLow"),
+        "est_eps_high":        _f("est_eps_high",        "estimatedEpsHigh"),
+        "est_eps_avg":         _f("est_eps_avg",         "estimatedEpsAvg"),
+        "est_net_income_low":  _f("est_net_income_low",  "estimatedNetIncomeLow",    "BIGINT"),
+        "est_net_income_high": _f("est_net_income_high", "estimatedNetIncomeHigh",   "BIGINT"),
+        "est_net_income_avg":  _f("est_net_income_avg",  "estimatedNetIncomeAvg",    "BIGINT"),
+        "est_sga_avg":         _f("est_sga_avg",         "estimatedSgaExpenseAvg",   "BIGINT"),
+        "num_analysts_revenue": _f("num_analysts_revenue","numberAnalystEstimatedRevenue", "INTEGER"),
+        "num_analysts_eps":    _f("num_analysts_eps",    "numberAnalystsEstimatedEps","INTEGER"),
+    },
+)
+
+_PRICE_TARGET = DatasetDef(
+    name="price_target",
+    endpoint="price-target-consensus",
+    grain=Grain.SNAPSHOT,
+    keys=("symbol",),
+    ttl_category="analyst",
+    fields={
+        "target_high":      _f("target_high",      "targetHigh"),
+        "target_low":       _f("target_low",       "targetLow"),
+        "target_consensus": _f("target_consensus", "targetConsensus"),
+        "target_median":    _f("target_median",    "targetMedian"),
+    },
+)
+
+_GRADES_CONSENSUS = DatasetDef(
+    name="grades_consensus",
+    endpoint="grades-consensus",
+    grain=Grain.SNAPSHOT,
+    keys=("symbol",),
+    ttl_category="analyst",
+    fields={
+        "strong_buy":  _f("strong_buy",  "strongBuy",  "INTEGER"),
+        "buy":         _f("buy",         "buy",        "INTEGER"),
+        "hold":        _f("hold",        "hold",       "INTEGER"),
+        "sell":        _f("sell",        "sell",        "INTEGER"),
+        "strong_sell": _f("strong_sell", "strongSell", "INTEGER"),
+        "consensus":   _f("consensus",  "consensus",  "VARCHAR"),
+    },
+)
+
+_RATINGS = DatasetDef(
+    name="ratings",
+    endpoint="ratings-snapshot",
+    grain=Grain.SNAPSHOT,
+    keys=("symbol",),
+    ttl_category="analyst",
+    fields={
+        "fmp_rating":        _f("fmp_rating",        "rating",              "VARCHAR"),
+        "fmp_rating_score":  _f("fmp_rating_score",  "ratingScore",         "INTEGER"),
+        "fmp_dcf_score":     _f("fmp_dcf_score",     "ratingDetailsDCFScore","INTEGER"),
+        "fmp_roe_score":     _f("fmp_roe_score",     "ratingDetailsROEScore","INTEGER"),
+        "fmp_roa_score":     _f("fmp_roa_score",     "ratingDetailsROAScore","INTEGER"),
+        "fmp_de_score":      _f("fmp_de_score",      "ratingDetailsDEScore", "INTEGER"),
+        "fmp_pe_score":      _f("fmp_pe_score",      "ratingDetailsPEScore", "INTEGER"),
+        "fmp_pb_score":      _f("fmp_pb_score",      "ratingDetailsPBScore", "INTEGER"),
+    },
+)
+
+_EMPLOYEE_COUNT = DatasetDef(
+    name="employee_count",
+    endpoint="historical-employee-count",
+    grain=Grain.ANNUAL,
+    keys=("symbol", "date"),
+    ttl_category="company_profiles",
+    fields={
+        "employee_count_val": _f("employee_count_val", "employeeCount", "INTEGER"),
+        "company_name_emp":   _f("company_name_emp",   "companyName",   "VARCHAR"),
+    },
+)
+
+_SHARES_FLOAT = DatasetDef(
+    name="shares_float_data",
+    endpoint="shares-float",
+    grain=Grain.SNAPSHOT,
+    keys=("symbol",),
+    ttl_category="company_profiles",
+    fields={
+        "free_float":           _f("free_float",           "freeFloat"),
+        "float_shares":         _f("float_shares",         "floatShares",         "BIGINT"),
+        "outstanding_shares":   _f("outstanding_shares",   "outstandingShares",   "BIGINT"),
+    },
+)
+
 _FINANCIAL_SCORES = DatasetDef(
     name="financial_scores",
     endpoint="financial-scores",
@@ -410,6 +530,13 @@ DATASETS: dict[str, DatasetDef] = {
         _DIVIDENDS,
         _ENTERPRISE_VALUES,
         _FINANCIAL_SCORES,
+        _TREASURY_RATES,
+        _ANALYST_ESTIMATES,
+        _PRICE_TARGET,
+        _GRADES_CONSENSUS,
+        _RATINGS,
+        _EMPLOYEE_COUNT,
+        _SHARES_FLOAT,
     ]
 }
 

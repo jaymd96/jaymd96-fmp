@@ -175,4 +175,27 @@ FEATURES = [
         category="risk",
         lag=True,
     ),
+    # ── Risk-adjusted return ratios ────────────────────────────────────
+    _d(
+        "sharpe_ratio_252d",
+        "((close / NULLIF(LAG(close, 252) OVER w, 0) - 1) - rate_10y / 100.0)"
+        " / NULLIF(STDDEV(close / NULLIF(LAG(close) OVER w, 0) - 1)"
+        " OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 251 PRECEDING AND CURRENT ROW) * SQRT(252), 0)",
+        ("close", "rate_10y"),
+        category="risk",
+        lag=True,
+    ),
+    _d(
+        "sortino_ratio_252d",
+        "((close / NULLIF(LAG(close, 252) OVER w, 0) - 1) - rate_10y / 100.0)"
+        " / NULLIF(STDDEV(CASE WHEN close < LAG(close) OVER w"
+        " THEN close / NULLIF(LAG(close) OVER w, 0) - 1"
+        " ELSE NULL END)"
+        " OVER (PARTITION BY symbol ORDER BY date"
+        " ROWS BETWEEN 251 PRECEDING AND CURRENT ROW) * SQRT(252), 0)",
+        ("close", "rate_10y"),
+        category="risk",
+        lag=True,
+    ),
 ]

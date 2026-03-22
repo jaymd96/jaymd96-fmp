@@ -257,31 +257,40 @@ class QueryBuilder:
 
     def _fetch_datasets(self, grouped: dict[str, list]) -> None:
         """Fetch each required dataset, writing to the bitemporal store."""
-        tasks: list[tuple[str, str]] = []  # (dataset_name, symbol)
+        tasks: list[tuple[str, str | None]] = []  # (dataset_name, symbol_or_None)
 
         for ds_name in grouped:
             ds = DATASETS[ds_name]
             ttl = self._ttls.get(ds.ttl_category, self._ttls.get("default", 3600))
-            for sym in self._symbols:
-                if not self._force and self._store.is_fresh(ds_name, sym, ttl):
+
+            if "symbol" not in ds.keys:
+                # Date-only dataset (e.g., treasury_rates) — fetch once
+                if not self._force and self._store.is_fresh(ds_name, None, ttl):
                     continue
-                tasks.append((ds_name, sym))
+                tasks.append((ds_name, None))
+            else:
+                for sym in self._symbols:
+                    if not self._force and self._store.is_fresh(ds_name, sym, ttl):
+                        continue
+                    tasks.append((ds_name, sym))
 
         if not tasks:
             return
 
-        def _fetch_one(ds_name: str, symbol: str) -> None:
+        def _fetch_one(ds_name: str, symbol: str | None) -> None:
             ds = DATASETS[ds_name]
-            params: dict[str, str] = {"symbol": symbol}
+            params: dict[str, str] = {}
+            if symbol:
+                params["symbol"] = symbol
             if "date" in ds.keys and self._start:
                 params["from"] = self._start
             if "date" in ds.keys and self._end:
                 params["to"] = self._end
             rows = self._http.get(ds.endpoint, params=params)
             if rows:
-                # Inject symbol if not present (many FMP endpoints omit it)
-                for row in rows:
-                    row.setdefault("symbol", symbol)
+                if symbol:
+                    for row in rows:
+                        row.setdefault("symbol", symbol)
                 self._store.write(ds_name, rows)
 
         with ThreadPoolExecutor(max_workers=min(10, len(tasks))) as pool:
@@ -322,7 +331,10 @@ class QueryBuilder:
             dedup_select = ", ".join(select_cols)
             partition_keys = ", ".join(ds.keys)
 
-            where_parts = [f"symbol IN ({sym_placeholders})"]
+            where_parts: list[str] = []
+            has_symbol = "symbol" in ds.keys
+            if has_symbol:
+                where_parts.append(f"symbol IN ({sym_placeholders})")
             # For datasets coarser than the target grain, skip the start-date
             # filter — ASOF JOIN needs preceding data to carry forward.
             will_asof = (
@@ -362,12 +374,19 @@ class QueryBuilder:
                         template = _AGG_SQL.get(agg_fn, "LAST({col} ORDER BY date)")
                         agg_exprs.append(f"{template.format(col=f.name)} AS {f.name}")
 
+                    has_sym = "symbol" in ds.keys
+                    group_cols = (
+                        "symbol, " if has_sym else ""
+                    ) + f"DATE_TRUNC('{trunc_unit}', date)"
+                    select_prefix = (
+                        "symbol, " if has_sym else ""
+                    ) + f"DATE_TRUNC('{trunc_unit}', date) AS date"
                     ctes.append(
                         f"{aligned_name} AS (\n"
-                        f"    SELECT symbol, DATE_TRUNC('{trunc_unit}', date) AS date,\n"
+                        f"    SELECT {select_prefix},\n"
                         f"           {', '.join(agg_exprs)}\n"
                         f"    FROM {dedup_name}\n"
-                        f"    GROUP BY symbol, DATE_TRUNC('{trunc_unit}', date)\n"
+                        f"    GROUP BY {group_cols}\n"
                         f")"
                     )
                 # Coarser → finer: handled via ASOF JOIN in final SELECT
@@ -380,21 +399,26 @@ class QueryBuilder:
 
         if len(dataset_infos) == 1:
             name, grain, fields = dataset_infos[0]
+            ds_def = DATASETS[[k for k, v in DATASETS.items()
+                               if any(name.startswith(k) for _ in [1])][0]]
+            has_symbol = "symbol" in ds_def.keys
             field_to_alias: dict[str, str] = {f.name: f.name for f in fields}
             base_cols = [f.name for f in fields]
-            key_cols = ["symbol"] + (["date"] if grain != Grain.SNAPSHOT else [])
+            key_cols = []
+            if has_symbol:
+                key_cols.append("symbol")
+            if grain != Grain.SNAPSHOT:
+                key_cols.append("date")
             derived_exprs = self._resolve_derived_exprs(derived, field_to_alias)
             all_cols = key_cols + base_cols + derived_exprs
             has_lag = any(d.requires_lag for d in derived)
-            window = (
-                f"\nWINDOW w AS (PARTITION BY symbol ORDER BY date)"
-                if has_lag else ""
-            )
+            partition = "PARTITION BY symbol ORDER BY date" if has_symbol else "ORDER BY date"
+            window = f"\nWINDOW w AS ({partition})" if has_lag else ""
             return (
                 f"WITH {', '.join(ctes)}\n"
                 f"SELECT {', '.join(all_cols)}\n"
                 f"FROM {name}{window}\n"
-                f"ORDER BY {', '.join(key_cols)}"
+                f"ORDER BY {', '.join(key_cols) if key_cols else 'date'}"
             )
 
         # Multiple datasets — need joins
@@ -423,9 +447,16 @@ class QueryBuilder:
         anchor_name, anchor_grain, anchor_fields = anchor
         anchor_alias = "t0"
 
+        # Determine if anchor has symbol
+        anchor_ds_name = anchor_name.replace("_dedup", "").replace("_agg", "")
+        anchor_ds = DATASETS.get(anchor_ds_name)
+        anchor_has_symbol = anchor_ds is not None and "symbol" in anchor_ds.keys
+
         # Build field-to-alias mapping
         field_to_alias = {}
-        select_parts = [f"{anchor_alias}.symbol"]
+        select_parts = []
+        if anchor_has_symbol:
+            select_parts.append(f"{anchor_alias}.symbol")
         if anchor_grain != Grain.SNAPSHOT:
             select_parts.append(f"{anchor_alias}.date")
         for f in anchor_fields:
@@ -440,7 +471,17 @@ class QueryBuilder:
                 select_parts.append(f"{alias}.{f.name}")
                 field_to_alias[f.name] = f"{alias}.{f.name}"
 
-            if grain == Grain.SNAPSHOT:
+            # Determine if this dataset has a symbol key
+            other_ds_name = name.replace("_dedup", "").replace("_agg", "")
+            other_ds = DATASETS.get(other_ds_name)
+            other_has_symbol = other_ds and "symbol" in other_ds.keys
+
+            if not other_has_symbol:
+                # Date-only dataset (e.g., treasury_rates) — join on date only
+                join_clauses.append(
+                    f"LEFT JOIN {name} {alias} ON {anchor_alias}.date = {alias}.date"
+                )
+            elif grain == Grain.SNAPSHOT:
                 join_clauses.append(
                     f"LEFT JOIN {name} {alias} ON {anchor_alias}.symbol = {alias}.symbol"
                 )

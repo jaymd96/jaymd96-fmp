@@ -1,8 +1,4 @@
-"""§6 — Valuation derived features.
-
-``forward_pe`` and ``peg_ratio`` are omitted because analyst-estimate data
-is not yet in the ontology.
-"""
+"""§6 — Valuation derived features."""
 
 from __future__ import annotations
 
@@ -16,8 +12,14 @@ FEATURES = [
         ("quote_market_cap", "net_income"),
         category="valuation",
     ),
-    # (forward_pe skipped — needs analyst estimates)
-    # (peg_ratio skipped — needs analyst estimates)
+    _d(
+        "peg_ratio",
+        "(price / NULLIF(eps_diluted, 0))"
+        " / NULLIF(((est_eps_avg - eps_diluted)"
+        " / NULLIF(ABS(eps_diluted), 0)) * 100, 0)",
+        ("price", "eps_diluted", "est_eps_avg"),
+        category="valuation",
+    ),
     _d(
         "price_to_sales_derived",
         "quote_market_cap / NULLIF(revenue, 0)",

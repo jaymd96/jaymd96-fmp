@@ -1,8 +1,4 @@
-"""§5 — Efficiency derived features.
-
-``revenue_per_employee`` and ``net_income_per_employee`` are omitted because
-the employee-count endpoint is not yet in the ontology.
-"""
+"""§5 — Efficiency derived features."""
 
 from __future__ import annotations
 
@@ -97,7 +93,19 @@ FEATURES = [
         ),
         category="efficiency",
     ),
-    # ── (revenue_per_employee and net_income_per_employee skipped) ─
+    # ── Employee productivity ────────────────────────────────────────
+    _d(
+        "revenue_per_employee",
+        "revenue / NULLIF(employee_count_val, 0)",
+        ("revenue", "employee_count_val"),
+        category="efficiency",
+    ),
+    _d(
+        "net_income_per_employee",
+        "net_income / NULLIF(employee_count_val, 0)",
+        ("net_income", "employee_count_val"),
+        category="efficiency",
+    ),
     # ── Expense ratios ─────────────────────────────────────────────
     _d(
         "opex_ratio",

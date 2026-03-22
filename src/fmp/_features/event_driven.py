@@ -28,4 +28,19 @@ FEATURES = [
         category="event_driven",
         dtype="INTEGER",
     ),
+    # ── Float & headcount ────────────────────────────────────────────
+    _d(
+        "float_pct",
+        "float_shares / NULLIF(outstanding_shares, 0)",
+        ("float_shares", "outstanding_shares"),
+        category="event_driven",
+    ),
+    _d(
+        "employee_growth",
+        "(employee_count_val - LAG(employee_count_val) OVER w)"
+        " / NULLIF(ABS(LAG(employee_count_val) OVER w), 0)",
+        ("employee_count_val",),
+        category="event_driven",
+        lag=True,
+    ),
 ]
