@@ -13,7 +13,7 @@ from fmp._ontology import Grain, list_fields
 from fmp._features import feature_categories, list_features
 from fmp._query import QueryBuilder
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 __all__ = [
     "FMPClient",
     "FMPError",
