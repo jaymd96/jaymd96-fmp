@@ -169,10 +169,7 @@ def test_sync_all(httpx_mock):
             url=re.compile(rf".*/ratios-bulk.*year={year}"),
             json=[],
         )
-        httpx_mock.add_response(
-            url=re.compile(rf".*/financial-scores-bulk.*year={year}"),
-            json=[],
-        )
+        # financial_scores uses per-symbol (not bulk) — no mock needed here
     # Paginated profile bulk, treasury rates
     httpx_mock.add_response(url=re.compile(r".*/profile-bulk.*"), json=[])
     httpx_mock.add_response(url=re.compile(r".*/treasury-rates.*"), json=[])

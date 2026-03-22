@@ -42,7 +42,7 @@ BULK_PAGINATED: dict[str, tuple[str, str]] = {
 # dataset → (bulk_endpoint, requires_year)
 # Year-based bulk, no period param
 BULK_YEARLY_NO_PERIOD: dict[str, tuple[str, bool]] = {
-    "financial_scores": ("financial-scores-bulk", True),
+    # financial_scores removed — bulk endpoint doesn't exist (404)
 }
 
 # dataset → batch_endpoint
@@ -65,7 +65,13 @@ DATE_ONLY = {"treasury_rates"}
 PER_SYMBOL_SNAPSHOT = {
     "quote", "dcf_data", "esg_data", "price_change",
     "institutional_summary", "price_target", "grades_consensus", "ratings",
-    "shares_float_data",
+    "shares_float_data", "financial_scores",
+}
+
+# Extra query params required by specific endpoints beyond symbol/date range.
+EXTRA_PARAMS: dict[str, dict[str, object]] = {
+    "institutional_summary": {"year": 2024, "quarter": 4},
+    "analyst_estimates": {"period": "annual"},
 }
 
 
@@ -478,6 +484,7 @@ class SyncManager:
         start: str | None, end: str | None, max_workers: int,
     ) -> int:
         ds = DATASETS[ds_name]
+        extra = EXTRA_PARAMS.get(ds_name, {})
         total = 0
 
         def _fetch_one(sym: str) -> int:
@@ -486,6 +493,7 @@ class SyncManager:
                 params["from"] = start
             if "date" in ds.keys and end:
                 params["to"] = end
+            params.update(extra)
             rows = self._http.get(endpoint, params=params)
             if rows:
                 for row in rows:
