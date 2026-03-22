@@ -84,7 +84,8 @@ class FMPClient(
         ttl_overrides: Override default TTL (seconds) per category.
         timeout: HTTP request timeout in seconds.
         max_retries: Max retry attempts on 429 responses.
-        rate_limit: Max requests per second (``None`` = unlimited).
+        rate_limit: Max requests per second. Defaults to ``10``.
+            Set to ``5`` for free-tier, ``30`` for premium, ``None`` for unlimited.
     """
 
     def __init__(
@@ -95,7 +96,7 @@ class FMPClient(
         ttl_overrides: dict[str, int] | None = None,
         timeout: float = 30.0,
         max_retries: int = 3,
-        rate_limit: float | None = None,
+        rate_limit: float | None = 10.0,
     ) -> None:
         resolved_key = api_key or os.environ.get("FMP_API_KEY")
         if not resolved_key:
@@ -316,6 +317,28 @@ class FMPClient(
             if len(batch) < limit:
                 break
         return all_results
+
+    # ------------------------------------------------------------------
+    # Rate limit control
+    # ------------------------------------------------------------------
+
+    @property
+    def rate_limit(self) -> float | None:
+        """Current rate limit in requests per second (``None`` = unlimited)."""
+        return self._http._limiter._rate if self._http._limiter else None
+
+    @rate_limit.setter
+    def rate_limit(self, value: float | None) -> None:
+        """Change the rate limit at runtime.
+
+        Example::
+
+            client.rate_limit = 5   # slow down for free-tier
+            client.rate_limit = 30  # speed up for premium
+            client.rate_limit = None  # unlimited (not recommended)
+        """
+        from fmp._http import TokenBucket
+        self._http._limiter = TokenBucket(value) if value else None
 
     # ------------------------------------------------------------------
     # Query builder (ontology-driven DataFrame API)
