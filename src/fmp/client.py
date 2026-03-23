@@ -232,6 +232,34 @@ class FMPClient(
             max_workers=max_workers, on_progress=on_progress,
         )
 
+    def sync_full(
+        self,
+        *,
+        countries: list[str] | None = None,
+        years: list[int] | None = None,
+        max_workers: int = 10,
+        on_progress: Callable[[str, str], None] | None = None,
+    ) -> dict[str, int]:
+        """Sync ALL datasets for all actively traded symbols in given countries.
+
+        Two-phase sync:
+        1. Bulk endpoints (profiles, financials, calendars) — ~50 API calls
+        2. Per-symbol endpoints (prices, insider trades, etc.) — N symbols × 27 datasets
+
+        Args:
+            countries: Country codes (e.g., ``["US", "GB"]``). Default: ``["US"]``.
+            years: Years to sync. Default: last 5 years.
+
+        Example::
+
+            # All US + UK stocks, last 2 years
+            client.sync_full(countries=["US", "GB"], years=[2024, 2025])
+        """
+        return self._sync.sync_full(
+            countries=countries, years=years,
+            max_workers=max_workers, on_progress=on_progress,
+        )
+
     def estimate_sync_calls(
         self,
         *,

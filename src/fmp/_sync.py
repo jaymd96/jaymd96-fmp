@@ -389,6 +389,133 @@ class SyncManager:
             on_progress=on_progress,
         )
 
+    # Main exchange codes per country (excludes OTC/pink sheets)
+    MAIN_EXCHANGES: dict[str, set[str]] = {
+        "US": {"NYSE", "NASDAQ", "AMEX"},
+        "GB": {"LSE"},
+        "DE": {"XETRA", "FSX"},
+        "FR": {"PAR"},
+        "JP": {"JPX"},
+        "CA": {"TSX"},
+        "AU": {"ASX"},
+        "HK": {"HKSE"},
+        "KR": {"KSC", "KOE"},
+        "CH": {"SIX"},
+        "SG": {"SGX"},
+        "IN": {"BSE", "NSE"},
+        "CN": {"SHZ", "SHH"},
+        "TW": {"TAI", "TWO"},
+        "SE": {"STO"},
+        "NL": {"AMS"},
+        "IT": {"MIL"},
+        "ES": {"BME"},
+        "BR": {"SAO"},
+    }
+
+    def sync_full(
+        self,
+        *,
+        countries: list[str] | None = None,
+        years: list[int] | None = None,
+        max_workers: int = 10,
+        on_progress: Callable[[str, str], None] | None = None,
+    ) -> dict[str, int]:
+        """Sync ALL datasets for all actively traded symbols in given countries.
+
+        1. Runs ``sync_all()`` to load bulk data (profiles, financials, etc.)
+        2. Reads profiles from the store to build a filtered symbol list
+        3. Runs ``sync()`` for all per-symbol datasets
+
+        Args:
+            countries: Country codes to include (e.g., ``["US", "GB"]``).
+                Defaults to ``["US"]``.
+            years: Years to sync. Defaults to last 5 years.
+            max_workers: Max concurrent API requests.
+            on_progress: Callback ``(dataset, message)``.
+
+        Example::
+
+            client.sync_full(countries=["US", "GB"], years=[2024, 2025])
+        """
+        import datetime
+
+        if countries is None:
+            countries = ["US"]
+        countries_upper = [c.upper() for c in countries]
+
+        if years is None:
+            current_year = datetime.date.today().year
+            years = list(range(current_year - 4, current_year + 1))
+
+        # Step 1: Bulk-load everything (profiles, financials, calendars, etc.)
+        if on_progress:
+            on_progress("sync_full", "Phase 1: loading bulk data...")
+        results = self.sync_all(
+            years=years, period="quarter", max_workers=max_workers,
+            on_progress=on_progress,
+        )
+
+        # Step 2: Build symbol list from loaded profiles
+        if on_progress:
+            on_progress("sync_full", "Building symbol list from profiles...")
+
+        # Collect valid exchanges for requested countries
+        valid_exchanges: set[str] = set()
+        for cc in countries_upper:
+            valid_exchanges |= self.MAIN_EXCHANGES.get(cc, set())
+
+        # US exchanges where dots/dashes indicate share classes (BRK.B, BF-A)
+        us_exchanges = self.MAIN_EXCHANGES.get("US", set())
+
+        profile_rows = self._store.read("profile", [])
+        symbols: list[str] = []
+        for row in profile_rows:
+            exchange = row.get("exchange_short", "")
+            if exchange not in valid_exchanges:
+                continue
+            if not row.get("is_actively_trading", True):
+                continue
+            if row.get("is_etf"):
+                continue
+            if row.get("is_fund"):
+                continue
+            sym = row.get("symbol")
+            if not sym:
+                continue
+            # Only filter dots/dashes for US (share classes like BRK.B, BF-A)
+            if exchange in us_exchanges and ("-" in sym or "." in sym):
+                continue
+            symbols.append(sym)
+
+        if on_progress:
+            on_progress(
+                "sync_full",
+                f"Phase 2: syncing {len(symbols)} symbols across "
+                f"{', '.join(countries_upper)} ({', '.join(valid_exchanges)})",
+            )
+
+        # Step 3: Sync all per-symbol datasets
+        start = f"{min(years)}-01-01"
+        end = f"{max(years)}-12-31"
+
+        per_symbol_results = self.sync(
+            symbols=symbols,
+            start=start, end=end,
+            period="quarter", use_bulk=True,
+            max_workers=max_workers,
+            on_progress=on_progress,
+        )
+
+        # Merge results
+        for ds_name, rows in per_symbol_results.items():
+            results[ds_name] = results.get(ds_name, 0) + rows
+
+        if on_progress:
+            total = sum(results.values())
+            on_progress("sync_full", f"Done: {total:,} total rows across {len(results)} datasets")
+
+        return results
+
     def estimate_calls(
         self,
         *,
