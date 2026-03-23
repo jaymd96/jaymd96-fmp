@@ -443,15 +443,21 @@ class SyncManager:
             countries = ["US"]
         countries_upper = [c.upper() for c in countries]
 
+        current_year = datetime.date.today().year
         if years is None:
-            current_year = datetime.date.today().year
             years = list(range(current_year - 4, current_year + 1))
+
+        # Always use a wide date range for per-symbol fetches — the call
+        # count is the same regardless of range (1 call per symbol per dataset).
+        # Only bulk yearly endpoints scale with year count (~5 extra calls/year).
+        min_year = min(min(years), current_year - 9)  # at least 10 years back
 
         # Step 1: Bulk-load everything (profiles, financials, calendars, etc.)
         if on_progress:
             on_progress("sync_full", "Phase 1: loading bulk data...")
+        bulk_years = list(range(min_year, max(years) + 1))
         results = self.sync_all(
-            years=years, period="quarter", max_workers=max_workers,
+            years=bulk_years, period="quarter", max_workers=max_workers,
             on_progress=on_progress,
         )
 
@@ -494,8 +500,8 @@ class SyncManager:
                 f"{', '.join(countries_upper)} ({', '.join(valid_exchanges)})",
             )
 
-        # Step 3: Sync all per-symbol datasets
-        start = f"{min(years)}-01-01"
+        # Step 3: Sync all per-symbol datasets (wide date range — it's free)
+        start = f"{min_year}-01-01"
         end = f"{max(years)}-12-31"
 
         per_symbol_results = self.sync(
