@@ -648,6 +648,31 @@ _DELISTED_COMPANIES = DatasetDef(
     },
 )
 
+_INSIDER_TRADES = DatasetDef(
+    name="insider_trades",
+    endpoint="insider-trading/search",
+    grain=Grain.DAILY,
+    keys=("symbol", "date"),
+    ttl_category="insider_trades",
+    date_api_name="transactionDate",
+    fields={
+        "insider_filing_date":      _f("insider_filing_date",      "filingDate",               "DATE"),
+        "reporting_cik":            _f("reporting_cik",            "reportingCik",             "VARCHAR"),
+        "company_cik":              _f("company_cik",              "companyCik",               "VARCHAR"),
+        "transaction_type":         _f("transaction_type",         "transactionType",          "VARCHAR"),
+        "securities_owned":         _f("securities_owned",         "securitiesOwned",          "BIGINT"),
+        "reporting_name":           _f("reporting_name",           "reportingName",            "VARCHAR"),
+        "type_of_owner":            _f("type_of_owner",            "typeOfOwner",              "VARCHAR"),
+        "acquistionOrDisposition":  _f("acquisition_or_disposition", "acquisitionOrDisposition", "VARCHAR"),
+        "direct_or_indirect":       _f("direct_or_indirect",       "directOrIndirect",         "VARCHAR"),
+        "form_type":                _f("form_type",                "formType",                 "VARCHAR"),
+        "securities_transacted":    _f("securities_transacted",    "securitiesTransacted",     "BIGINT"),
+        "insider_price":            _f("insider_price",            "price"),
+        "security_name":            _f("security_name",            "securityName",             "VARCHAR"),
+        "insider_url":              _f("insider_url",              "url",                      "VARCHAR"),
+    },
+)
+
 _MERGERS_ACQUISITIONS = DatasetDef(
     name="mergers_acquisitions",
     endpoint="mergers-acquisitions-latest",
@@ -721,6 +746,7 @@ DATASETS: dict[str, DatasetDef] = {
         _HISTORICAL_RATINGS,
         _HISTORICAL_INSTITUTIONAL,
         _DELISTED_COMPANIES,
+        _INSIDER_TRADES,
         _MERGERS_ACQUISITIONS,
     ]
 }

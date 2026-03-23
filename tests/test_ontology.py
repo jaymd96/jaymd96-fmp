@@ -11,7 +11,7 @@ from fmp._ontology import (
 
 
 def test_all_datasets_registered():
-    assert len(DATASETS) == 30
+    assert len(DATASETS) == 31
     assert "daily_price" in DATASETS
     assert "income_statement" in DATASETS
     assert "quote" in DATASETS

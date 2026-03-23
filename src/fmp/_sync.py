@@ -60,6 +60,7 @@ PER_SYMBOL_TIMESERIES = {
     "historical_market_cap",  # daily market cap history
     "historical_grades",      # monthly analyst consensus history
     "historical_ratings",     # monthly FMP rating history
+    "insider_trades",         # per-symbol insider trading history
 }
 
 # Datasets that need custom multi-period sync (iterate year/quarter combos)
@@ -83,6 +84,7 @@ EXTRA_PARAMS: dict[str, dict[str, object]] = {
     "analyst_estimates": {"period": "annual", "limit": 100},
     "historical_grades": {"limit": 500},
     "historical_ratings": {"limit": 500},
+    "insider_trades": {"limit": 500},
     # Financial statements: fetch quarterly data with full history
     "income_statement": {"period": "quarter", "limit": 200},
     "balance_sheet": {"period": "quarter", "limit": 200},
