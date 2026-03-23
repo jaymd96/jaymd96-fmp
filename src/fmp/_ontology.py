@@ -691,6 +691,268 @@ _MERGERS_ACQUISITIONS = DatasetDef(
     },
 )
 
+# ──────────────────────────────────────────────────────────────────────
+# Calendars (cross-symbol event data, fetched by date range)
+# ──────────────────────────────────────────────────────────────────────
+
+_EARNINGS_CALENDAR = DatasetDef(
+    name="earnings_calendar",
+    endpoint="earnings-calendar",
+    grain=Grain.DAILY,
+    keys=("symbol", "date"),
+    ttl_category="earnings_calendar",
+    fields={
+        "ec_eps_actual":         _f("ec_eps_actual",         "epsActual"),
+        "ec_eps_estimated":      _f("ec_eps_estimated",      "epsEstimated"),
+        "ec_revenue_actual":     _f("ec_revenue_actual",     "revenueActual",     "BIGINT"),
+        "ec_revenue_estimated":  _f("ec_revenue_estimated",  "revenueEstimated",  "BIGINT"),
+        "ec_last_updated":       _f("ec_last_updated",       "lastUpdated",       "DATE"),
+    },
+)
+
+_DIVIDENDS_CALENDAR = DatasetDef(
+    name="dividends_calendar",
+    endpoint="dividends-calendar",
+    grain=Grain.DAILY,
+    keys=("symbol", "date"),
+    ttl_category="earnings_calendar",
+    fields={
+        "dc_record_date":      _f("dc_record_date",      "recordDate",       "DATE"),
+        "dc_payment_date":     _f("dc_payment_date",     "paymentDate",      "DATE"),
+        "dc_declaration_date": _f("dc_declaration_date", "declarationDate",  "DATE"),
+        "dc_adj_dividend":     _f("dc_adj_dividend",     "adjDividend"),
+        "dc_dividend":         _f("dc_dividend",         "dividend"),
+        "dc_yield":            _f("dc_yield",            "yield"),
+        "dc_frequency":        _f("dc_frequency",        "frequency",        "VARCHAR"),
+    },
+)
+
+_SPLITS_CALENDAR = DatasetDef(
+    name="splits_calendar",
+    endpoint="splits-calendar",
+    grain=Grain.DAILY,
+    keys=("symbol", "date"),
+    ttl_category="earnings_calendar",
+    fields={
+        "split_numerator":   _f("split_numerator",   "numerator",   "INTEGER"),
+        "split_denominator": _f("split_denominator", "denominator", "INTEGER"),
+        "split_type":        _f("split_type",        "splitType",   "VARCHAR"),
+    },
+)
+
+_IPOS_CALENDAR = DatasetDef(
+    name="ipos_calendar",
+    endpoint="ipos-calendar",
+    grain=Grain.DAILY,
+    keys=("symbol", "date"),
+    ttl_category="earnings_calendar",
+    fields={
+        "ipo_company":     _f("ipo_company",     "company",     "VARCHAR"),
+        "ipo_exchange":    _f("ipo_exchange",     "exchange",    "VARCHAR"),
+        "ipo_actions":     _f("ipo_actions",      "actions",     "VARCHAR"),
+        "ipo_shares":      _f("ipo_shares",       "shares",      "BIGINT"),
+        "ipo_price_range": _f("ipo_price_range",  "priceRange",  "VARCHAR"),
+        "ipo_market_cap":  _f("ipo_market_cap",   "marketCap",   "BIGINT"),
+    },
+)
+
+_ECONOMIC_CALENDAR = DatasetDef(
+    name="economic_calendar",
+    endpoint="economic-calendar",
+    grain=Grain.DAILY,
+    keys=("date",),
+    ttl_category="daily_historical",
+    fields={
+        "econ_country":    _f("econ_country",    "country",          "VARCHAR"),
+        "econ_event":      _f("econ_event",      "event",            "VARCHAR"),
+        "econ_currency":   _f("econ_currency",   "currency",         "VARCHAR"),
+        "econ_previous":   _f("econ_previous",   "previous"),
+        "econ_estimate":   _f("econ_estimate",   "estimate"),
+        "econ_actual":     _f("econ_actual",     "actual"),
+        "econ_change":     _f("econ_change",     "change"),
+        "econ_impact":     _f("econ_impact",     "impact",           "VARCHAR"),
+        "econ_change_pct": _f("econ_change_pct", "changePercentage"),
+        "econ_unit":       _f("econ_unit",       "unit",             "VARCHAR"),
+    },
+)
+
+# ──────────────────────────────────────────────────────────────────────
+# TTM (Trailing Twelve Months) datasets — snapshot, per-symbol
+# ──────────────────────────────────────────────────────────────────────
+
+_INCOME_STATEMENT_TTM = DatasetDef(
+    name="income_statement_ttm",
+    endpoint="income-statement-ttm",
+    grain=Grain.SNAPSHOT,
+    keys=("symbol",),
+    ttl_category="financial_statements",
+    fields={
+        "ttm_revenue":              _f("ttm_revenue",              "revenue",                          "BIGINT"),
+        "ttm_cost_of_revenue":      _f("ttm_cost_of_revenue",      "costOfRevenue",                   "BIGINT"),
+        "ttm_gross_profit":         _f("ttm_gross_profit",         "grossProfit",                      "BIGINT"),
+        "ttm_rd_expenses":          _f("ttm_rd_expenses",          "researchAndDevelopmentExpenses",   "BIGINT"),
+        "ttm_sga_expenses":         _f("ttm_sga_expenses",         "sellingGeneralAndAdministrativeExpenses", "BIGINT"),
+        "ttm_operating_expenses":   _f("ttm_operating_expenses",   "operatingExpenses",                "BIGINT"),
+        "ttm_operating_income":     _f("ttm_operating_income",     "operatingIncome",                  "BIGINT"),
+        "ttm_interest_income":      _f("ttm_interest_income",      "interestIncome",                   "BIGINT"),
+        "ttm_interest_expense":     _f("ttm_interest_expense",     "interestExpense",                  "BIGINT"),
+        "ttm_ebitda":               _f("ttm_ebitda",               "ebitda",                           "BIGINT"),
+        "ttm_ebit":                 _f("ttm_ebit",                 "ebit",                             "BIGINT"),
+        "ttm_net_income":           _f("ttm_net_income",           "netIncome",                        "BIGINT"),
+        "ttm_eps":                  _f("ttm_eps",                  "eps"),
+        "ttm_eps_diluted":          _f("ttm_eps_diluted",          "epsDiluted"),
+        "ttm_income_before_tax":    _f("ttm_income_before_tax",    "incomeBeforeTax",                  "BIGINT"),
+        "ttm_income_tax_expense":   _f("ttm_income_tax_expense",   "incomeTaxExpense",                 "BIGINT"),
+        "ttm_da":                   _f("ttm_da",                   "depreciationAndAmortization",      "BIGINT"),
+    },
+)
+
+_KEY_METRICS_TTM = DatasetDef(
+    name="key_metrics_ttm",
+    endpoint="key-metrics-ttm",
+    grain=Grain.SNAPSHOT,
+    keys=("symbol",),
+    ttl_category="financial_statements",
+    fields={
+        "ttm_market_cap":              _f("ttm_market_cap",              "marketCap",                       "BIGINT"),
+        "ttm_ev":                      _f("ttm_ev",                      "enterpriseValueTTM",              "BIGINT"),
+        "ttm_ev_to_sales":             _f("ttm_ev_to_sales",             "evToSalesTTM"),
+        "ttm_ev_to_ocf":               _f("ttm_ev_to_ocf",               "evToOperatingCashFlowTTM"),
+        "ttm_ev_to_fcf":               _f("ttm_ev_to_fcf",               "evToFreeCashFlowTTM"),
+        "ttm_ev_to_ebitda":            _f("ttm_ev_to_ebitda",            "evToEBITDATTM"),
+        "ttm_net_debt_to_ebitda":      _f("ttm_net_debt_to_ebitda",      "netDebtToEBITDATTM"),
+        "ttm_current_ratio":           _f("ttm_current_ratio",           "currentRatioTTM"),
+        "ttm_roa":                     _f("ttm_roa",                     "returnOnAssetsTTM"),
+        "ttm_roe":                     _f("ttm_roe",                     "returnOnEquityTTM"),
+        "ttm_roic":                    _f("ttm_roic",                    "returnOnInvestedCapitalTTM"),
+        "ttm_roce":                    _f("ttm_roce",                    "returnOnCapitalEmployedTTM"),
+        "ttm_earnings_yield":          _f("ttm_earnings_yield",          "earningsYieldTTM"),
+        "ttm_fcf_yield":               _f("ttm_fcf_yield",              "freeCashFlowYieldTTM"),
+        "ttm_capex_to_ocf":            _f("ttm_capex_to_ocf",            "capexToOperatingCashFlowTTM"),
+        "ttm_capex_to_revenue":        _f("ttm_capex_to_revenue",        "capexToRevenueTTM"),
+        "ttm_rd_to_revenue":           _f("ttm_rd_to_revenue",           "researchAndDevelopementToRevenueTTM"),
+        "ttm_sbc_to_revenue":          _f("ttm_sbc_to_revenue",          "stockBasedCompensationToRevenueTTM"),
+        "ttm_dso":                     _f("ttm_dso",                     "daysOfSalesOutstandingTTM"),
+        "ttm_dpo":                     _f("ttm_dpo",                     "daysOfPayablesOutstandingTTM"),
+        "ttm_dio":                     _f("ttm_dio",                     "daysOfInventoryOutstandingTTM"),
+        "ttm_ccc":                     _f("ttm_ccc",                     "cashConversionCycleTTM"),
+        "ttm_graham_number":           _f("ttm_graham_number",           "grahamNumberTTM"),
+        "ttm_working_capital":         _f("ttm_working_capital",         "workingCapitalTTM",               "BIGINT"),
+        "ttm_invested_capital":        _f("ttm_invested_capital",        "investedCapitalTTM",              "BIGINT"),
+        "ttm_tangible_asset_value":    _f("ttm_tangible_asset_value",    "tangibleAssetValueTTM",           "BIGINT"),
+    },
+)
+
+_RATIOS_TTM = DatasetDef(
+    name="ratios_ttm",
+    endpoint="ratios-ttm",
+    grain=Grain.SNAPSHOT,
+    keys=("symbol",),
+    ttl_category="financial_statements",
+    fields={
+        "ttm_gross_margin":          _f("ttm_gross_margin",          "grossProfitMarginTTM"),
+        "ttm_ebitda_margin":         _f("ttm_ebitda_margin",         "ebitdaMarginTTM"),
+        "ttm_operating_margin":      _f("ttm_operating_margin",      "operatingProfitMarginTTM"),
+        "ttm_net_margin":            _f("ttm_net_margin",            "netProfitMarginTTM"),
+        "ttm_pe_ratio":              _f("ttm_pe_ratio",              "priceToEarningsRatioTTM"),
+        "ttm_peg_ratio":             _f("ttm_peg_ratio",             "priceToEarningsGrowthRatioTTM"),
+        "ttm_pb_ratio":              _f("ttm_pb_ratio",              "priceToBookRatioTTM"),
+        "ttm_ps_ratio":              _f("ttm_ps_ratio",              "priceToSalesRatioTTM"),
+        "ttm_p_to_fcf":              _f("ttm_p_to_fcf",              "priceToFreeCashFlowRatioTTM"),
+        "ttm_p_to_ocf":              _f("ttm_p_to_ocf",              "priceToOperatingCashFlowRatioTTM"),
+        "ttm_debt_to_assets":        _f("ttm_debt_to_assets",        "debtToAssetsRatioTTM"),
+        "ttm_debt_to_equity":        _f("ttm_debt_to_equity",        "debtToEquityRatioTTM"),
+        "ttm_debt_to_capital":       _f("ttm_debt_to_capital",       "debtToCapitalRatioTTM"),
+        "ttm_financial_leverage":    _f("ttm_financial_leverage",    "financialLeverageRatioTTM"),
+        "ttm_quick_ratio":           _f("ttm_quick_ratio",           "quickRatioTTM"),
+        "ttm_cash_ratio":            _f("ttm_cash_ratio",            "cashRatioTTM"),
+        "ttm_receivables_turnover":  _f("ttm_receivables_turnover",  "receivablesTurnoverTTM"),
+        "ttm_inventory_turnover":    _f("ttm_inventory_turnover",    "inventoryTurnoverTTM"),
+        "ttm_asset_turnover":        _f("ttm_asset_turnover",        "assetTurnoverTTM"),
+        "ttm_ocf_ratio":             _f("ttm_ocf_ratio",             "operatingCashFlowRatioTTM"),
+        "ttm_ocf_to_sales":          _f("ttm_ocf_to_sales",          "operatingCashFlowSalesRatioTTM"),
+        "ttm_fcf_to_ocf":            _f("ttm_fcf_to_ocf",            "freeCashFlowOperatingCashFlowRatioTTM"),
+        "ttm_interest_coverage":     _f("ttm_interest_coverage",     "interestCoverageTTM"),  # mapped wrong if 0
+        "ttm_dividend_payout":       _f("ttm_dividend_payout",       "dividendPayoutRatioTTM"),
+        "ttm_dividend_yield_r":      _f("ttm_dividend_yield_r",      "dividendYieldTTM"),
+        "ttm_effective_tax_rate":    _f("ttm_effective_tax_rate",     "effectiveTaxRateTTM"),
+        "ttm_revenue_per_share":     _f("ttm_revenue_per_share",     "revenuePerShareTTM"),
+        "ttm_ni_per_share":          _f("ttm_ni_per_share",          "netIncomePerShareTTM"),
+        "ttm_book_value_per_share":  _f("ttm_book_value_per_share",  "bookValuePerShareTTM"),
+        "ttm_ocf_per_share":         _f("ttm_ocf_per_share",         "operatingCashFlowPerShareTTM"),
+        "ttm_fcf_per_share":         _f("ttm_fcf_per_share",         "freeCashFlowPerShareTTM"),
+        "ttm_cash_per_share":        _f("ttm_cash_per_share",        "cashPerShareTTM"),
+        "ttm_ev_multiple":           _f("ttm_ev_multiple",           "enterpriseValueMultipleTTM"),
+        "ttm_dividend_per_share":    _f("ttm_dividend_per_share",    "dividendPerShareTTM"),
+    },
+)
+
+# ──────────────────────────────────────────────────────────────────────
+# Growth rate datasets — quarterly YoY growth, per-symbol
+# ──────────────────────────────────────────────────────────────────────
+
+_INCOME_GROWTH = DatasetDef(
+    name="income_growth",
+    endpoint="income-statement-growth",
+    grain=Grain.QUARTERLY,
+    keys=("symbol", "date", "period"),
+    ttl_category="financial_statements",
+    fields={
+        "growth_revenue":             _f("growth_revenue",             "growthRevenue"),
+        "growth_gross_profit":        _f("growth_gross_profit",        "growthGrossProfit"),
+        "growth_gross_profit_ratio":  _f("growth_gross_profit_ratio",  "growthGrossProfitRatio"),
+        "growth_rd_expenses":         _f("growth_rd_expenses",         "growthResearchAndDevelopmentExpenses"),
+        "growth_operating_expenses":  _f("growth_operating_expenses",  "growthOperatingExpenses"),
+        "growth_operating_income":    _f("growth_operating_income",    "growthOperatingIncome"),
+        "growth_ebitda":              _f("growth_ebitda",              "growthEBITDA"),
+        "growth_net_income":          _f("growth_net_income",          "growthNetIncome"),
+        "growth_eps":                 _f("growth_eps",                 "growthEPS"),
+        "growth_eps_diluted":         _f("growth_eps_diluted",         "growthEPSDiluted"),
+    },
+)
+
+_BALANCE_SHEET_GROWTH = DatasetDef(
+    name="balance_sheet_growth",
+    endpoint="balance-sheet-statement-growth",
+    grain=Grain.QUARTERLY,
+    keys=("symbol", "date", "period"),
+    ttl_category="financial_statements",
+    fields={
+        "growth_cash":                _f("growth_cash",                "growthCashAndCashEquivalents"),
+        "growth_receivables":         _f("growth_receivables",         "growthNetReceivables"),
+        "growth_inventory":           _f("growth_inventory",           "growthInventory"),
+        "growth_total_current_assets": _f("growth_total_current_assets", "growthTotalCurrentAssets"),
+        "growth_total_assets":        _f("growth_total_assets",        "growthTotalAssets"),
+        "growth_short_term_debt":     _f("growth_short_term_debt",     "growthShortTermDebt"),
+        "growth_long_term_debt":      _f("growth_long_term_debt",      "growthLongTermDebt"),
+        "growth_total_liabilities":   _f("growth_total_liabilities",   "growthTotalLiabilities"),
+        "growth_retained_earnings":   _f("growth_retained_earnings",   "growthRetainedEarnings"),
+        "growth_total_equity":        _f("growth_total_equity",        "growthTotalStockholdersEquity"),
+        "growth_total_debt":          _f("growth_total_debt",          "growthTotalDebt"),
+        "growth_net_debt":            _f("growth_net_debt",            "growthNetDebt"),
+    },
+)
+
+_CASH_FLOW_GROWTH = DatasetDef(
+    name="cash_flow_growth",
+    endpoint="cash-flow-statement-growth",
+    grain=Grain.QUARTERLY,
+    keys=("symbol", "date", "period"),
+    ttl_category="financial_statements",
+    fields={
+        "growth_operating_cf":     _f("growth_operating_cf",     "growthNetCashProvidedByOperatingActivites"),
+        "growth_investing_cf":     _f("growth_investing_cf",     "growthNetCashUsedForInvestingActivites"),
+        "growth_financing_cf":     _f("growth_financing_cf",     "growthNetCashUsedProvidedByFinancingActivities"),
+        "growth_capex":            _f("growth_capex",            "growthCapitalExpenditure"),
+        "growth_fcf":              _f("growth_fcf",              "growthFreeCashFlow"),
+        "growth_dividends_paid":   _f("growth_dividends_paid",   "growthDividendsPaid"),
+        "growth_stock_repurchased": _f("growth_stock_repurchased", "growthCommonStockRepurchased"),
+        "growth_sbc":              _f("growth_sbc",              "growthStockBasedCompensation"),
+        "growth_da":               _f("growth_da",               "growthDepreciationAndAmortization"),
+        "growth_net_change_cash":  _f("growth_net_change_cash",  "growthNetChangeInCash"),
+    },
+)
+
 _HISTORICAL_INSTITUTIONAL = DatasetDef(
     name="historical_institutional",
     endpoint="institutional-ownership/symbol-positions-summary",
@@ -748,6 +1010,17 @@ DATASETS: dict[str, DatasetDef] = {
         _DELISTED_COMPANIES,
         _INSIDER_TRADES,
         _MERGERS_ACQUISITIONS,
+        _EARNINGS_CALENDAR,
+        _DIVIDENDS_CALENDAR,
+        _SPLITS_CALENDAR,
+        _IPOS_CALENDAR,
+        _ECONOMIC_CALENDAR,
+        _INCOME_STATEMENT_TTM,
+        _KEY_METRICS_TTM,
+        _RATIOS_TTM,
+        _INCOME_GROWTH,
+        _BALANCE_SHEET_GROWTH,
+        _CASH_FLOW_GROWTH,
     ]
 }
 

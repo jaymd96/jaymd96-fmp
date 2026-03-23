@@ -74,16 +74,14 @@ class BitemporalStore:
 
         ds = DATASETS[dataset]
 
-        # Build api_name → column_name mapping
-        api_to_col: dict[str, str] = {}
+        # Build column_name → api_name reverse mapping (O(1) lookup)
+        col_to_api: dict[str, str] = {}
         for field in ds.fields.values():
-            api_to_col[field.api_name] = field.name
-
-        # Also map key columns that come from the API
-        api_to_col.setdefault("symbol", "symbol")
-        api_to_col.setdefault(ds.date_api_name, "date")
+            col_to_api[field.name] = field.api_name
+        col_to_api.setdefault("symbol", "symbol")
+        col_to_api.setdefault("date", ds.date_api_name)
         if "period" in ds.keys:
-            api_to_col.setdefault("period", "period")
+            col_to_api.setdefault("period", "period")
 
         # Determine columns present in the data
         all_table_cols = list(ds.keys)
@@ -91,19 +89,13 @@ class BitemporalStore:
             if field.name not in ds.keys:
                 all_table_cols.append(field.name)
 
-        # Transform rows
+        # Build lookup list once: [(api_key_for_col_0), (api_key_for_col_1), ...]
+        api_keys = [col_to_api.get(col) for col in all_table_cols]
+
+        # Transform rows using pre-built lookup
         transformed: list[list[Any]] = []
         for row in rows:
-            values: list[Any] = []
-            for col in all_table_cols:
-                # Find the API key that maps to this column
-                api_key = None
-                for ak, cn in api_to_col.items():
-                    if cn == col:
-                        api_key = ak
-                        break
-                values.append(row.get(api_key) if api_key else None)
-            transformed.append(values)
+            transformed.append([row.get(ak) if ak else None for ak in api_keys])
 
         placeholders = ", ".join(["?"] * len(all_table_cols))
         col_names = ", ".join(all_table_cols)

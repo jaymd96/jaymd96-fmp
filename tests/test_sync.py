@@ -170,12 +170,17 @@ def test_sync_all(httpx_mock):
             json=[],
         )
         # financial_scores uses per-symbol (not bulk) — no mock needed here
-    # Paginated bulk, batch, treasury rates
+    # Paginated bulk, batch, date-only, calendars
     httpx_mock.add_response(url=re.compile(r".*/profile-bulk.*"), json=[])
     httpx_mock.add_response(url=re.compile(r".*/delisted-companies.*"), json=[])
     httpx_mock.add_response(url=re.compile(r".*/mergers-acquisitions-latest.*"), json=[])
     httpx_mock.add_response(url=re.compile(r".*/shares-float-all.*"), json=[])
     httpx_mock.add_response(url=re.compile(r".*/treasury-rates.*"), json=[])
+    httpx_mock.add_response(url=re.compile(r".*/economic-calendar.*"), json=[])
+    httpx_mock.add_response(url=re.compile(r".*/earnings-calendar.*"), json=[])
+    httpx_mock.add_response(url=re.compile(r".*/dividends-calendar.*"), json=[])
+    httpx_mock.add_response(url=re.compile(r".*/splits-calendar.*"), json=[])
+    httpx_mock.add_response(url=re.compile(r".*/ipos-calendar.*"), json=[])
 
     c = FMPClient(api_key="test", cache_path=None)
     result = c.sync_all(years=[2022, 2023])

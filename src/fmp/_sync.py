@@ -61,6 +61,7 @@ PER_SYMBOL_TIMESERIES = {
     "historical_grades",      # monthly analyst consensus history
     "historical_ratings",     # monthly FMP rating history
     "insider_trades",         # per-symbol insider trading history
+    "income_growth", "balance_sheet_growth", "cash_flow_growth",
 }
 
 # Datasets that need custom multi-period sync (iterate year/quarter combos)
@@ -68,14 +69,21 @@ MULTI_PERIOD_DATASETS = {
     "historical_institutional",  # quarterly institutional ownership history
 }
 
+# Calendar datasets — cross-symbol, fetched by date range (no symbol key needed)
+CALENDAR_DATASETS = {
+    "earnings_calendar", "dividends_calendar", "splits_calendar",
+    "ipos_calendar",
+}
+
 # Datasets that are date-only (no symbol key) — fetch once
-DATE_ONLY = {"treasury_rates"}
+DATE_ONLY = {"treasury_rates", "economic_calendar"}
 
 # Snapshot datasets without bulk — fetch per symbol, no date range
 PER_SYMBOL_SNAPSHOT = {
     "quote", "dcf_data", "esg_data", "price_change",
     "institutional_summary", "price_target", "grades_consensus", "ratings",
     "financial_scores",
+    "income_statement_ttm", "key_metrics_ttm", "ratios_ttm",
 }
 
 # Extra query params required by specific endpoints beyond symbol/date range.
@@ -92,6 +100,9 @@ EXTRA_PARAMS: dict[str, dict[str, object]] = {
     "key_metrics": {"period": "quarter", "limit": 200},
     "ratios": {"period": "quarter", "limit": 200},
     "enterprise_values": {"period": "quarter", "limit": 200},
+    "income_growth": {"period": "quarter", "limit": 200},
+    "balance_sheet_growth": {"period": "quarter", "limit": 200},
+    "cash_flow_growth": {"period": "quarter", "limit": 200},
 }
 
 
@@ -119,6 +130,8 @@ def _api_calls_estimate(
         elif ds in BATCH_ALL:
             est[ds] = 1
         elif ds in DATE_ONLY:
+            est[ds] = 1
+        elif ds in CALENDAR_DATASETS:
             est[ds] = 1
         elif ds in PER_SYMBOL_TIMESERIES:
             est[ds] = n_sym
@@ -196,6 +209,8 @@ class SyncManager:
             elif ds_name in BATCH_ALL:
                 rows = self._sync_batch(ds_name, _prog)
             elif ds_name in DATE_ONLY:
+                rows = self._sync_date_only(ds_name, start, end, _prog)
+            elif ds_name in CALENDAR_DATASETS:
                 rows = self._sync_date_only(ds_name, start, end, _prog)
             elif ds_name in PER_SYMBOL_SNAPSHOT:
                 rows = self._sync_per_symbol_snapshot(
@@ -292,8 +307,17 @@ class SyncManager:
                 ds_name, lambda msg, _ds=ds_name: _prog(_ds, msg)
             )
 
-        # Treasury rates
+        # Date-only datasets (treasury rates, economic calendar)
         for ds_name in DATE_ONLY:
+            start_y = str(min(years))
+            end_y = str(max(years))
+            results[ds_name] = self._sync_date_only(
+                ds_name, f"{start_y}-01-01", f"{end_y}-12-31",
+                lambda msg, _ds=ds_name: _prog(_ds, msg),
+            )
+
+        # Calendar datasets (earnings, dividends, splits, IPOs)
+        for ds_name in CALENDAR_DATASETS:
             start_y = str(min(years))
             end_y = str(max(years))
             results[ds_name] = self._sync_date_only(
