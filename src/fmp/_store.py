@@ -23,8 +23,28 @@ class BitemporalStore:
 
     def __init__(self, conn: duckdb.DuckDBPyConnection) -> None:
         self._conn = conn
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._init_tables()
+
+    def _execute(self, sql: str, params: list | None = None):
+        """Thread-safe execute on the DuckDB connection."""
+        with self._lock:
+            if params:
+                return self._conn.execute(sql, params)
+            return self._conn.execute(sql)
+
+    def _fetchall(self, sql: str, params: list | None = None) -> list[tuple]:
+        """Thread-safe execute + fetchall."""
+        with self._lock:
+            result = self._conn.execute(sql, params or [])
+            return result.fetchall()
+
+    def _fetchall_with_cols(self, sql: str, params: list | None = None) -> tuple[list[str], list[tuple]]:
+        """Thread-safe execute + fetchall returning (column_names, rows)."""
+        with self._lock:
+            result = self._conn.execute(sql, params or [])
+            cols = [desc[0] for desc in result.description]
+            return cols, result.fetchall()
 
     # ------------------------------------------------------------------
     # Table creation
@@ -32,7 +52,7 @@ class BitemporalStore:
 
     def _init_tables(self) -> None:
         for ds in DATASETS.values():
-            self._conn.execute(self._ddl(ds))
+            self._execute(self._ddl(ds))
 
     @staticmethod
     def _ddl(ds: DatasetDef) -> str:
@@ -68,11 +88,18 @@ class BitemporalStore:
 
         Translates camelCase API field names to snake_case column names.
         Unknown API fields are silently dropped.  Returns row count.
+        Uses pandas DataFrame for fast columnar ingestion into DuckDB.
         """
         if not rows:
             return 0
 
         ds = DATASETS[dataset]
+
+        # Filter out rows missing required key values (e.g., null symbol from bulk CSV)
+        if "symbol" in ds.keys:
+            rows = [r for r in rows if r.get("symbol")]
+        if not rows:
+            return 0
 
         # Build column_name → api_name reverse mapping (O(1) lookup)
         col_to_api: dict[str, str] = {}
@@ -89,22 +116,34 @@ class BitemporalStore:
             if field.name not in ds.keys:
                 all_table_cols.append(field.name)
 
-        # Build lookup list once: [(api_key_for_col_0), (api_key_for_col_1), ...]
+        # Build lookup list once
         api_keys = [col_to_api.get(col) for col in all_table_cols]
 
-        # Transform rows using pre-built lookup
-        transformed: list[list[Any]] = []
-        for row in rows:
-            transformed.append([row.get(ak) if ak else None for ak in api_keys])
+        # Identify DATE columns for empty-string → None coercion
+        date_cols = {f.name for f in ds.fields.values() if f.dtype == "DATE"}
+        date_cols |= {"date"} if "date" in ds.keys else set()
 
-        placeholders = ", ".join(["?"] * len(all_table_cols))
+        # Build pandas DataFrame for fast DuckDB ingestion
+        import pandas as pd
+
+        data = {}
+        for col, ak in zip(all_table_cols, api_keys):
+            values = [row.get(ak) if ak else None for row in rows]
+            if col in date_cols:
+                values = [v if v else None for v in values]
+            data[col] = values
+        df = pd.DataFrame(data)
+
         col_names = ", ".join(all_table_cols)
-        sql = f"INSERT INTO {ds.name} ({col_names}) VALUES ({placeholders})"
-
+        view_name = f"_bulk_{threading.get_ident()}"
         with self._lock:
-            self._conn.executemany(sql, transformed)
+            self._conn.register(view_name, df)
+            self._conn.execute(
+                f"INSERT INTO {ds.name} ({col_names}) SELECT {col_names} FROM {view_name}"
+            )
+            self._conn.unregister(view_name)
 
-        return len(transformed)
+        return len(rows)
 
     # ------------------------------------------------------------------
     # Read (bitemporal de-dup)
@@ -162,9 +201,8 @@ class BitemporalStore:
             ORDER BY {partition_keys}
         """
 
-        result = self._conn.execute(sql, params)
-        cols = [desc[0] for desc in result.description]
-        return [dict(zip(cols, row)) for row in result.fetchall()]
+        cols, rows = self._fetchall_with_cols(sql, params)
+        return [dict(zip(cols, row)) for row in rows]
 
     def read_raw(
         self,
@@ -204,25 +242,16 @@ class BitemporalStore:
         """
         ds = DATASETS[dataset]
         if "symbol" in ds.keys and symbol:
-            row = self._conn.execute(
-                f"""
-                SELECT 1 FROM {dataset}
-                WHERE symbol = ?
-                  AND _fetched_at + (? || ' seconds')::INTERVAL > now()
-                LIMIT 1
-                """,
+            rows = self._fetchall(
+                f"SELECT 1 FROM {dataset} WHERE symbol = ? AND _fetched_at + (? || ' seconds')::INTERVAL > now() LIMIT 1",
                 [symbol, ttl],
-            ).fetchone()
+            )
         else:
-            row = self._conn.execute(
-                f"""
-                SELECT 1 FROM {dataset}
-                WHERE _fetched_at + (? || ' seconds')::INTERVAL > now()
-                LIMIT 1
-                """,
+            rows = self._fetchall(
+                f"SELECT 1 FROM {dataset} WHERE _fetched_at + (? || ' seconds')::INTERVAL > now() LIMIT 1",
                 [ttl],
-            ).fetchone()
-        return row is not None
+            )
+        return len(rows) > 0
 
     # ------------------------------------------------------------------
     # Data existence checks (for sync — no TTL, just "is data there?")
@@ -248,30 +277,26 @@ class BitemporalStore:
             params.append(end)
 
         where = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
-        row = self._conn.execute(
-            f"SELECT 1 FROM {dataset} {where} LIMIT 1", params
-        ).fetchone()
-        return row is not None
+        rows = self._fetchall(f"SELECT 1 FROM {dataset} {where} LIMIT 1", params)
+        return len(rows) > 0
 
     def has_bulk_data(self, dataset: str, year: int) -> bool:
         """Check if bulk data for a given year has been loaded."""
         ds = DATASETS[dataset]
         if "date" not in ds.keys:
             return self.row_count(dataset) > 0
-        row = self._conn.execute(
+        rows = self._fetchall(
             f"SELECT 1 FROM {dataset} WHERE EXTRACT(YEAR FROM date) = ? LIMIT 1",
             [year],
-        ).fetchone()
-        return row is not None
+        )
+        return len(rows) > 0
 
     def symbols_with_data(self, dataset: str) -> list[str]:
         """List all symbols that have data in this dataset."""
         ds = DATASETS[dataset]
         if "symbol" not in ds.keys:
             return []
-        rows = self._conn.execute(
-            f"SELECT DISTINCT symbol FROM {dataset} ORDER BY symbol"
-        ).fetchall()
+        rows = self._fetchall(f"SELECT DISTINCT symbol FROM {dataset} ORDER BY symbol")
         return [r[0] for r in rows]
 
     # ------------------------------------------------------------------
@@ -302,9 +327,8 @@ class BitemporalStore:
             ORDER BY _fetched_at
         """
 
-        result = self._conn.execute(sql, params)
-        cols = [desc[0] for desc in result.description]
-        return [dict(zip(cols, row)) for row in result.fetchall()]
+        cols, rows = self._fetchall_with_cols(sql, params)
+        return [dict(zip(cols, row)) for row in rows]
 
     # ------------------------------------------------------------------
     # Maintenance
@@ -315,24 +339,24 @@ class BitemporalStore:
         ds = DATASETS[dataset]
         partition_keys = ", ".join(ds.keys)
 
-        result = self._conn.execute(f"""
-            DELETE FROM {ds.name}
-            WHERE rowid IN (
-                SELECT rowid FROM (
-                    SELECT rowid,
-                           ROW_NUMBER() OVER (
-                               PARTITION BY {partition_keys}
-                               ORDER BY _fetched_at DESC
-                           ) AS rn
-                    FROM {ds.name}
-                ) sub
-                WHERE rn > ?
-            )
-        """, [keep_latest_n])
-
-        return result.fetchone()[0] if result.description else 0
+        with self._lock:
+            result = self._conn.execute(f"""
+                DELETE FROM {ds.name}
+                WHERE rowid IN (
+                    SELECT rowid FROM (
+                        SELECT rowid,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY {partition_keys}
+                                   ORDER BY _fetched_at DESC
+                               ) AS rn
+                        FROM {ds.name}
+                    ) sub
+                    WHERE rn > ?
+                )
+            """, [keep_latest_n])
+            return result.fetchone()[0] if result.description else 0
 
     def row_count(self, dataset: str) -> int:
         """Total rows in the typed table."""
-        row = self._conn.execute(f"SELECT COUNT(*) FROM {dataset}").fetchone()
-        return row[0] if row else 0
+        rows = self._fetchall(f"SELECT COUNT(*) FROM {dataset}")
+        return rows[0][0] if rows else 0

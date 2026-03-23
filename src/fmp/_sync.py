@@ -240,12 +240,13 @@ class SyncManager:
         *,
         years: list[int] | None = None,
         period: str = "annual",
+        max_workers: int = 10,
         on_progress: Callable[[str, str], None] | None = None,
     ) -> dict[str, int]:
         """Bulk-load ALL financial statement data for the given years.
 
-        Uses bulk endpoints exclusively. One API call per dataset per year.
-        Also loads profiles (paginated bulk) and financial scores.
+        Uses bulk endpoints exclusively. Parallelises across datasets
+        and years using a thread pool (rate limiter handles throttling).
         """
         import datetime
         if years is None:
@@ -258,74 +259,86 @@ class SyncManager:
             if on_progress:
                 on_progress(ds, msg)
 
-        # Yearly bulk (financial statements, metrics, ratios)
-        for ds_name, (endpoint, _, needs_period) in BULK_YEARLY.items():
-            total = 0
-            for year in years:
-                if self._store.has_bulk_data(ds_name, year):
-                    _prog(ds_name, f"year {year} already loaded")
-                    continue
-                _prog(ds_name, f"fetching year {year}...")
-                params: dict = {"year": year}
-                if needs_period:
-                    params["period"] = period
-                try:
-                    rows = self._http.get(endpoint, params=params)
-                    if rows:
-                        total += self._store.write(ds_name, rows)
-                        _prog(ds_name, f"year {year}: {len(rows)} rows")
-                except Exception as exc:
-                    _prog(ds_name, f"year {year} failed: {exc}")
-            results[ds_name] = total
+        # Build a list of all tasks to run in parallel
+        futures: dict = {}
 
-        # Yearly bulk without period (financial scores)
-        for ds_name, (endpoint, _) in BULK_YEARLY_NO_PERIOD.items():
-            total = 0
-            for year in years:
-                if self._store.has_bulk_data(ds_name, year):
-                    _prog(ds_name, f"year {year} already loaded")
-                    continue
-                _prog(ds_name, f"fetching year {year}...")
-                try:
-                    rows = self._http.get(endpoint, params={"year": year})
-                    if rows:
-                        total += self._store.write(ds_name, rows)
-                except Exception as exc:
-                    _prog(ds_name, f"year {year} failed: {exc}")
-            results[ds_name] = total
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            # Yearly bulk (financial statements, metrics, ratios)
+            for ds_name, (endpoint, _, needs_period) in BULK_YEARLY.items():
+                for year in years:
+                    if self._store.has_bulk_data(ds_name, year):
+                        _prog(ds_name, f"year {year} already loaded")
+                        continue
+                    params: dict = {"year": year}
+                    if needs_period:
+                        params["period"] = period
+                    fut = pool.submit(self._fetch_and_write, ds_name, endpoint, params, _prog)
+                    futures[fut] = (ds_name, f"year {year}")
 
-        # Paginated bulk (profiles)
-        for ds_name in BULK_PAGINATED:
-            _prog(ds_name, "fetching paginated bulk...")
-            results[ds_name] = self._sync_bulk_paginated(
-                ds_name, lambda msg, _ds=ds_name: _prog(_ds, msg)
-            )
+            # Yearly bulk without period
+            for ds_name, (endpoint, _) in BULK_YEARLY_NO_PERIOD.items():
+                for year in years:
+                    if self._store.has_bulk_data(ds_name, year):
+                        _prog(ds_name, f"year {year} already loaded")
+                        continue
+                    fut = pool.submit(self._fetch_and_write, ds_name, endpoint, {"year": year}, _prog)
+                    futures[fut] = (ds_name, f"year {year}")
 
-        # Batch (quotes)
-        for ds_name in BATCH_ALL:
-            results[ds_name] = self._sync_batch(
-                ds_name, lambda msg, _ds=ds_name: _prog(_ds, msg)
-            )
+            # Paginated bulk (profiles, delisted, M&A)
+            for ds_name in BULK_PAGINATED:
+                fut = pool.submit(
+                    self._sync_bulk_paginated, ds_name,
+                    lambda msg, _ds=ds_name: _prog(_ds, msg),
+                )
+                futures[fut] = (ds_name, "paginated")
 
-        # Date-only datasets (treasury rates, economic calendar)
-        for ds_name in DATE_ONLY:
+            # Batch (shares float)
+            for ds_name in BATCH_ALL:
+                fut = pool.submit(
+                    self._sync_batch, ds_name,
+                    lambda msg, _ds=ds_name: _prog(_ds, msg),
+                )
+                futures[fut] = (ds_name, "batch")
+
+            # Date-only (treasury rates, economic calendar)
             start_y = str(min(years))
             end_y = str(max(years))
-            results[ds_name] = self._sync_date_only(
-                ds_name, f"{start_y}-01-01", f"{end_y}-12-31",
-                lambda msg, _ds=ds_name: _prog(_ds, msg),
-            )
+            for ds_name in DATE_ONLY | CALENDAR_DATASETS:
+                fut = pool.submit(
+                    self._sync_date_only, ds_name,
+                    f"{start_y}-01-01", f"{end_y}-12-31",
+                    lambda msg, _ds=ds_name: _prog(_ds, msg),
+                )
+                futures[fut] = (ds_name, "date-only")
 
-        # Calendar datasets (earnings, dividends, splits, IPOs)
-        for ds_name in CALENDAR_DATASETS:
-            start_y = str(min(years))
-            end_y = str(max(years))
-            results[ds_name] = self._sync_date_only(
-                ds_name, f"{start_y}-01-01", f"{end_y}-12-31",
-                lambda msg, _ds=ds_name: _prog(_ds, msg),
-            )
+            # Collect results
+            for fut in as_completed(futures):
+                ds_name, label = futures[fut]
+                try:
+                    rows = fut.result() or 0
+                    results[ds_name] = results.get(ds_name, 0) + rows
+                except Exception as exc:
+                    _prog(ds_name, f"{label} failed: {exc}")
+                    results.setdefault(ds_name, 0)
 
         return results
+
+    def _fetch_and_write(
+        self, ds_name: str, endpoint: str, params: dict,
+        progress: Callable,
+    ) -> int:
+        """Fetch a single bulk endpoint and write to store."""
+        label = " ".join(f"{k}={v}" for k, v in params.items())
+        progress(ds_name, f"fetching {label}...")
+        try:
+            rows = self._http.get(endpoint, params=params)
+            if rows:
+                count = self._store.write(ds_name, rows)
+                progress(ds_name, f"{label}: {len(rows)} rows")
+                return count
+        except Exception as exc:
+            progress(ds_name, f"{label} failed: {exc}")
+        return 0
 
     def sync_universe(
         self,
